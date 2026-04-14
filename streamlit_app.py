@@ -5,6 +5,8 @@ import subprocess
 import shutil
 import base64
 import time
+import re
+from io import StringIO
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -12,6 +14,11 @@ import unicodedata
 import plotly.express as px
 import pandas as pd
 import streamlit as st
+
+try:
+    import requests
+except ImportError:
+    requests = None
 def agregar_logo_central_tenue(ruta_logo: str):
     if not os.path.exists(ruta_logo):
         return
@@ -184,6 +191,75 @@ def usd_fmt(valor):
         return f"USD {valor:,.0f}".replace(",", ".")
     except Exception:
         return "USD 0"
+
+
+
+def clp_fmt(valor, decimales=0):
+    try:
+        if decimales == 0:
+            return f"CLP {valor:,.0f}".replace(",", ".")
+        txt = f"CLP {valor:,.{decimales}f}"
+        txt = txt.replace(",", "X").replace(".", ",").replace("X", ".")
+        return txt
+    except Exception:
+        return "CLP 0"
+
+
+def texto_a_float_chileno(texto):
+    try:
+        return float(str(texto).replace(".", "").replace(",", ".").strip())
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def obtener_dolar_observado_bcch():
+    url = "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_TIPO_CAMBIO/MN_TIPO_CAMBIO4/DOLAR_OBS_ADO"
+
+    if requests is None:
+        return None, "No está instalada la librería requests."
+
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept-Language": "es-CL,es;q=0.9,en;q=0.8",
+        }
+        resp = requests.get(url, headers=headers, timeout=20)
+        resp.raise_for_status()
+        html = resp.text
+
+        # Intento 1: extraer el bloque del cuadro y tomar el último valor publicado
+        bloque = re.search(
+            r"D[óo]lar observado(.*?)(?:Eliminar canasta|Exportar a Excel|Mi BDE)",
+            html,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if bloque:
+            valores = re.findall(r"\d{1,3}(?:\.\d{3})*,\d{2}", bloque.group(1))
+            if valores:
+                valor = texto_a_float_chileno(valores[-1])
+                if valor is not None:
+                    return valor, "Fuente: Banco Central de Chile"
+
+        # Intento 2: leer tablas HTML si el sitio entrega la tabla renderizada
+        try:
+            tablas = pd.read_html(StringIO(html))
+            for tabla in tablas:
+                tabla = tabla.copy()
+                for _, fila in tabla.iterrows():
+                    fila_txt = " | ".join(fila.astype(str).tolist()).lower()
+                    if "dólar observado" in fila_txt or "dolar observado" in fila_txt:
+                        for valor_txt in reversed(fila.astype(str).tolist()):
+                            valor = texto_a_float_chileno(valor_txt)
+                            if valor is not None and valor > 0:
+                                return valor, "Fuente: Banco Central de Chile"
+        except Exception:
+            pass
+
+        return None, "No fue posible identificar el valor publicado en el sitio del Banco Central."
+
+    except Exception as e:
+        return None, f"No fue posible consultar el Banco Central: {e}"
 
 
 def limpiar_nombre_archivo(texto):
@@ -1376,10 +1452,17 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             )
 
         with csel2:
+            dolar_bcch, mensaje_dolar = obtener_dolar_observado_bcch()
+
+            if dolar_bcch is not None:
+                st.caption(f"{mensaje_dolar}: {clp_fmt(dolar_bcch, decimales=2)}")
+            else:
+                st.warning(mensaje_dolar)
+
             dolar_observado = st.number_input(
                 "Dólar observado CLP",
                 min_value=1.0,
-                value=950.0,
+                value=float(dolar_bcch) if dolar_bcch is not None else 950.0,
                 step=1.0,
                 disabled=not puede_editar_costos,
                 key="dolar_observado_tab5"
@@ -1467,7 +1550,7 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             st.metric("Precio Venta Dealer", usd_fmt(precio_venta_dealer_usd))
 
         with k4:
-            st.metric("Dólar observado", f"CLP {dolar_observado:,.0f}".replace(",", "."))
+            st.metric("Dólar observado", clp_fmt(dolar_observado))
 
         st.markdown("### Objetivos de venta sobre valor final")
 
@@ -1495,8 +1578,8 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         df_objetivos_vista = df_objetivos.copy()
         df_objetivos_vista["USD sin IVA"] = df_objetivos_vista["USD sin IVA"].apply(usd_fmt)
         df_objetivos_vista["USD con IVA"] = df_objetivos_vista["USD con IVA"].apply(usd_fmt)
-        df_objetivos_vista["CLP sin IVA"] = df_objetivos_vista["CLP sin IVA"].apply(lambda x: f"CLP {x:,.0f}".replace(",", "."))
-        df_objetivos_vista["CLP con IVA"] = df_objetivos_vista["CLP con IVA"].apply(lambda x: f"CLP {x:,.0f}".replace(",", "."))
+        df_objetivos_vista["CLP sin IVA"] = df_objetivos_vista["CLP sin IVA"].apply(clp_fmt)
+        df_objetivos_vista["CLP con IVA"] = df_objetivos_vista["CLP con IVA"].apply(clp_fmt)
 
         st.dataframe(df_objetivos_vista, use_container_width=True)
 
@@ -1534,7 +1617,7 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
                 f"{margen_dealer_pct:.1f}%",
                 usd_fmt(bono_vendedor_interno),
                 usd_fmt(precio_venta_dealer_usd),
-                f"CLP {dolar_observado:,.0f}".replace(",", "."),
+                clp_fmt(dolar_observado),
                 f"{iva_pct:.1f}%"
             ]
         })
