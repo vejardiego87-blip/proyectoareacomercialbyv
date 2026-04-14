@@ -1,2 +1,11 @@
 streamlit
 pandas
+openpyxl
+plotly
+kaleido
+altair
+docxtpl
+python-docx
+reportlab
+pydeck
+matplotlib
