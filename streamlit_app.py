@@ -6,6 +6,9 @@ import shutil
 import base64
 import time
 import gspread
+import requests
+import re
+from io import StringIO
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -187,6 +190,80 @@ def usd_fmt(valor):
     except Exception:
         return "USD 0"
 
+def usd_fmt(valor):
+    try:
+        return f"USD {valor:,.0f}".replace(",", ".")
+    except Exception:
+        return "USD 0"
+
+
+# PEGA AQUÍ ESTAS FUNCIONES
+def clp_fmt(valor, decimales=0):
+    try:
+        if decimales == 0:
+            return f"CLP {valor:,.0f}".replace(",", ".")
+        txt = f"CLP {valor:,.{decimales}f}"
+        txt = txt.replace(",", "X").replace(".", ",").replace("X", ".")
+        return txt
+    except Exception:
+        return "CLP 0"
+
+
+def texto_a_float_chileno(texto):
+    try:
+        return float(str(texto).replace(".", "").replace(",", ".").strip())
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def obtener_dolar_observado_bcch():
+    url = "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_TIPO_CAMBIO/MN_TIPO_CAMBIO4/DOLAR_OBS_ADO"
+
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept-Language": "es-CL,es;q=0.9,en;q=0.8",
+        }
+        resp = requests.get(url, headers=headers, timeout=20)
+        resp.raise_for_status()
+        html = resp.text
+
+        bloque = re.search(
+            r"D[óo]lar observado(.*?)(?:Eliminar canasta|Exportar a Excel|Mi BDE)",
+            html,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if bloque:
+            valores = re.findall(r"\d{1,3}(?:\.\d{3})*,\d{2}", bloque.group(1))
+            if valores:
+                valor = texto_a_float_chileno(valores[-1])
+                if valor is not None:
+                    return valor, "Fuente: Banco Central de Chile"
+
+        try:
+            tablas = pd.read_html(StringIO(html))
+            for tabla in tablas:
+                tabla = tabla.copy()
+                for _, fila in tabla.iterrows():
+                    fila_txt = " | ".join(fila.astype(str).tolist()).lower()
+                    if "dólar observado" in fila_txt or "dolar observado" in fila_txt:
+                        for valor_txt in reversed(fila.astype(str).tolist()):
+                            valor = texto_a_float_chileno(valor_txt)
+                            if valor is not None and valor > 0:
+                                return valor, "Fuente: Banco Central de Chile"
+        except Exception:
+            pass
+
+        return None, "No fue posible identificar el valor publicado en el sitio del Banco Central."
+
+    except Exception as e:
+        return None, f"No fue posible consultar el Banco Central: {e}"
+
+
+def limpiar_nombre_archivo(texto):
+    texto = str(texto).strip().replace(" ", "_")
+    ...
 
 def limpiar_nombre_archivo(texto):
     texto = str(texto).strip().replace(" ", "_")
