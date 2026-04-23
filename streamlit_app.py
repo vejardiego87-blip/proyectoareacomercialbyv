@@ -1448,7 +1448,7 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
 
         puede_editar_costos = st.session_state.usuario in {"forellana", "dvejar"}
 
-        ARCHIVO_COSTOS = "/workspaces/proyectoareacomercialbyv/data/Estructura de costos.xlsx"
+        ARCHIVO_COSTOS = os.path.join("data", "Estructura de costos.xlsx")
 
         def cargar_hojas_costos():
             if not os.path.exists(ARCHIVO_COSTOS):
