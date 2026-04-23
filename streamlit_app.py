@@ -5,6 +5,8 @@ import subprocess
 import shutil
 import base64
 import time
+import gspread
+from google.oauth2.service_account import Credentials
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -253,6 +255,57 @@ def normalizar_columnas(df):
         nuevas[c] = c_norm
     return df.rename(columns=nuevas)
 # =========================================================
+# GOOGLE SHEETS - HISTORIAL
+# =========================================================
+GSHEET_SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
+
+@st.cache_resource
+def get_gsheet_client():
+    creds_info = dict(st.secrets["gsheets"]["service_account"])
+    if "private_key" in creds_info:
+        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+
+    creds = Credentials.from_service_account_info(
+        creds_info,
+        scopes=GSHEET_SCOPES
+    )
+    return gspread.authorize(creds)
+
+@st.cache_resource
+def get_gsheet():
+    client = get_gsheet_client()
+    return client.open_by_key(st.secrets["gsheets"]["spreadsheet_id"])
+
+def asegurar_hoja_historial():
+    sh = get_gsheet()
+    try:
+        ws = sh.worksheet("HistorialCotizaciones")
+    except Exception:
+        ws = sh.add_worksheet(title="HistorialCotizaciones", rows=2000, cols=20)
+        ws.append_row([
+            "id",
+            "fecha",
+            "cliente",
+            "cotizante",
+            "prefijo",
+            "correlativo",
+            "numero_cotizacion",
+            "modelo",
+            "capacidad_bateria",
+            "cantidad_unidades",
+            "precio_unitario",
+            "total_negocio",
+            "lugar_entrega",
+            "contrato_mantto",
+            "texto_mantto",
+            "creado_en",
+        ])
+    return ws
+
+# =========================================================
 # BASE DE DATOS
 # =========================================================
 def get_conn():
@@ -385,30 +438,40 @@ def init_db():
 def siguiente_correlativo(cotizante):
     prefijo = COTIZANTES[cotizante]["prefijo"]
     ws = asegurar_hoja_historial()
+    registros = ws.get_all_records()
 
-    data = ws.get_all_records()
-
-    usados = [
-        int(r["correlativo"])
-        for r in data
-        if r["prefijo"] == prefijo and str(r["correlativo"]).isdigit()
-    ]
+    usados = []
+    for row in registros:
+        try:
+            if str(row.get("prefijo", "")).strip() == prefijo:
+                usados.append(int(row.get("correlativo", 0)))
+        except Exception:
+            pass
 
     correlativo = 1
     while correlativo in usados:
         correlativo += 1
-
     return correlativo
 
 
 def guardar_cotizacion(data):
     ws = asegurar_hoja_historial()
-
     registros = ws.get_all_records()
-    nuevo_id = len(registros) + 1
+    creado_en = ahora_santiago().strftime("%Y-%m-%d %H:%M:%S")
+
+    next_id = 1
+    if registros:
+        ids = []
+        for r in registros:
+            try:
+                ids.append(int(r.get("id", 0)))
+            except Exception:
+                pass
+        if ids:
+            next_id = max(ids) + 1
 
     ws.append_row([
-        nuevo_id,
+        next_id,
         data["fecha_iso"],
         data["cliente"],
         data["cotizante"],
@@ -423,7 +486,7 @@ def guardar_cotizacion(data):
         data["lugar_entrega"],
         data["contrato_mantto"],
         data["texto_mantto"],
-        ahora_santiago().strftime("%Y-%m-%d %H:%M:%S")
+        creado_en,
     ])
     conn.commit()
     conn.close()
@@ -431,23 +494,69 @@ def guardar_cotizacion(data):
 
 def cargar_historial():
     ws = asegurar_hoja_historial()
-    data = ws.get_all_records()
+    registros = ws.get_all_records()
 
-    if not data:
-        return pd.DataFrame()
+    if not registros:
+        return pd.DataFrame(columns=[
+            "id",
+            "fecha",
+            "cliente",
+            "cotizante",
+            "numero_cotizacion",
+            "modelo",
+            "cantidad_unidades",
+            "precio_unitario",
+            "total_negocio",
+            "capacidad_bateria",
+            "lugar_entrega",
+            "creado_en",
+        ])
 
-    return pd.DataFrame(data)
+    df = pd.DataFrame(registros)
+
+    columnas_esperadas = [
+        "id",
+        "fecha",
+        "cliente",
+        "cotizante",
+        "numero_cotizacion",
+        "modelo",
+        "cantidad_unidades",
+        "precio_unitario",
+        "total_negocio",
+        "capacidad_bateria",
+        "lugar_entrega",
+        "creado_en",
+    ]
+
+    for c in columnas_esperadas:
+        if c not in df.columns:
+            df[c] = ""
+
+    return df[columnas_esperadas].sort_values("id", ascending=False)
 
 
 def eliminar_cotizacion_por_id(cotizacion_id):
     ws = asegurar_hoja_historial()
-    data = ws.get_all_records()
+    values = ws.get_all_values()
 
-    for i, row in enumerate(data, start=2):  # fila 1 = header
-        if str(row["id"]) == str(cotizacion_id):
-            ws.delete_rows(i)
-            break
+    if not values or len(values) < 2:
+        return
 
+    header = values[0]
+    filas = values[1:]
+
+    nuevas_filas = [header]
+
+    for fila in filas:
+        try:
+            if int(fila[0]) != int(cotizacion_id):
+                nuevas_filas.append(fila)
+        except Exception:
+            nuevas_filas.append(fila)
+
+    ws.clear()
+    ws.update("A1", nuevas_filas)
 # =========================================================
 # DOCX / PDF
 # =========================================================
