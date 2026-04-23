@@ -330,9 +330,8 @@ def normalizar_columnas(df):
         c_norm = normalizar_texto(c)
         nuevas[c] = c_norm
     return df.rename(columns=nuevas)
-
 # =========================================================
-# GOOGLE SHEETS
+# GOOGLE SHEETS - HISTORIAL
 # =========================================================
 GSHEET_SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -342,6 +341,9 @@ GSHEET_SCOPES = [
 @st.cache_resource
 def get_gsheet_client():
     creds_info = dict(st.secrets["gsheets"]["service_account"])
+    if "private_key" in creds_info:
+        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+
     creds = Credentials.from_service_account_info(
         creds_info,
         scopes=GSHEET_SCOPES
@@ -351,12 +353,7 @@ def get_gsheet_client():
 @st.cache_resource
 def get_gsheet():
     client = get_gsheet_client()
-    spreadsheet_name = st.secrets["gsheets"]["spreadsheet_name"]
-    return client.open(spreadsheet_name)
-
-def get_ws(nombre_hoja):
-    sh = get_gsheet()
-    return sh.worksheet(nombre_hoja)
+    return client.open_by_key("12iAqv8Gj6a3LRgTg95oJFS5ip1FSVetM2Q62ozuNGs4")
 
 def asegurar_hoja_historial():
     sh = get_gsheet()
@@ -531,6 +528,7 @@ def siguiente_correlativo(cotizante):
         correlativo += 1
     return correlativo
 
+
 def guardar_cotizacion(data):
     ws = asegurar_hoja_historial()
     registros = ws.get_all_records()
@@ -565,6 +563,7 @@ def guardar_cotizacion(data):
         data["texto_mantto"],
         creado_en,
     ])
+
 
 def cargar_historial():
     ws = asegurar_hoja_historial()
@@ -609,6 +608,7 @@ def cargar_historial():
 
     return df[columnas_esperadas].sort_values("id", ascending=False)
 
+
 def eliminar_cotizacion_por_id(cotizacion_id):
     ws = asegurar_hoja_historial()
     values = ws.get_all_values()
@@ -630,6 +630,7 @@ def eliminar_cotizacion_por_id(cotizacion_id):
 
     ws.clear()
     ws.update("A1", nuevas_filas)
+
 # =========================================================
 # DOCX / PDF
 # =========================================================
