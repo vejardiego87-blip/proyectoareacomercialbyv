@@ -384,36 +384,31 @@ def init_db():
 
 def siguiente_correlativo(cotizante):
     prefijo = COTIZANTES[cotizante]["prefijo"]
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT correlativo
-        FROM cotizaciones
-        WHERE prefijo = ?
-        ORDER BY correlativo ASC
-    """, (prefijo,))
-    usados = [row[0] for row in cur.fetchall() if row[0] is not None]
-    conn.close()
+    ws = asegurar_hoja_historial()
+
+    data = ws.get_all_records()
+
+    usados = [
+        int(r["correlativo"])
+        for r in data
+        if r["prefijo"] == prefijo and str(r["correlativo"]).isdigit()
+    ]
 
     correlativo = 1
     while correlativo in usados:
         correlativo += 1
+
     return correlativo
 
 
 def guardar_cotizacion(data):
-    conn = get_conn()
-    cur = conn.cursor()
-    creado_en = ahora_santiago().strftime("%Y-%m-%d %H:%M:%S")
+    ws = asegurar_hoja_historial()
 
-    cur.execute("""
-        INSERT INTO cotizaciones (
-            fecha, cliente, cotizante, prefijo, correlativo, numero_cotizacion,
-            modelo, capacidad_bateria, cantidad_unidades, precio_unitario, total_negocio,
-            lugar_entrega, contrato_mantto, texto_mantto, creado_en
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
+    registros = ws.get_all_records()
+    nuevo_id = len(registros) + 1
+
+    ws.append_row([
+        nuevo_id,
         data["fecha_iso"],
         data["cliente"],
         data["cotizante"],
@@ -428,41 +423,30 @@ def guardar_cotizacion(data):
         data["lugar_entrega"],
         data["contrato_mantto"],
         data["texto_mantto"],
-        creado_en,
-    ))
+        ahora_santiago().strftime("%Y-%m-%d %H:%M:%S")
+    ])
     conn.commit()
     conn.close()
 
 
 def cargar_historial():
-    conn = get_conn()
-    df = pd.read_sql_query("""
-        SELECT
-            id,
-            fecha,
-            cliente,
-            cotizante,
-            numero_cotizacion,
-            modelo,
-            cantidad_unidades,
-            precio_unitario,
-            total_negocio,
-            COALESCE(capacidad_bateria, '') AS capacidad_bateria,
-            COALESCE(lugar_entrega, '') AS lugar_entrega,
-            COALESCE(creado_en, '') AS creado_en
-        FROM cotizaciones
-        ORDER BY id DESC
-    """, conn)
-    conn.close()
-    return df
+    ws = asegurar_hoja_historial()
+    data = ws.get_all_records()
+
+    if not data:
+        return pd.DataFrame()
+
+    return pd.DataFrame(data)
 
 
 def eliminar_cotizacion_por_id(cotizacion_id):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM cotizaciones WHERE id = ?", (cotizacion_id,))
-    conn.commit()
-    conn.close()
+    ws = asegurar_hoja_historial()
+    data = ws.get_all_records()
+
+    for i, row in enumerate(data, start=2):  # fila 1 = header
+        if str(row["id"]) == str(cotizacion_id):
+            ws.delete_rows(i)
+            break
 
 # =========================================================
 # DOCX / PDF
