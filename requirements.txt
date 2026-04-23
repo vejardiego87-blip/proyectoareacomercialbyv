@@ -9,5 +9,3 @@ python-docx
 reportlab
 pydeck
 matplotlib
-gspread
-google-auth

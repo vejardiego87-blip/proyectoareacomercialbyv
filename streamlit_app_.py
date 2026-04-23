@@ -5,10 +5,6 @@ import subprocess
 import shutil
 import base64
 import time
-import re
-import gspread
-from google.oauth2.service_account import Credentials
-from io import StringIO
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -16,11 +12,6 @@ import unicodedata
 import plotly.express as px
 import pandas as pd
 import streamlit as st
-
-try:
-    import requests
-except ImportError:
-    requests = None
 def agregar_logo_central_tenue(ruta_logo: str):
     if not os.path.exists(ruta_logo):
         return
@@ -195,75 +186,6 @@ def usd_fmt(valor):
         return "USD 0"
 
 
-
-def clp_fmt(valor, decimales=0):
-    try:
-        if decimales == 0:
-            return f"CLP {valor:,.0f}".replace(",", ".")
-        txt = f"CLP {valor:,.{decimales}f}"
-        txt = txt.replace(",", "X").replace(".", ",").replace("X", ".")
-        return txt
-    except Exception:
-        return "CLP 0"
-
-
-def texto_a_float_chileno(texto):
-    try:
-        return float(str(texto).replace(".", "").replace(",", ".").strip())
-    except Exception:
-        return None
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def obtener_dolar_observado_bcch():
-    url = "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_TIPO_CAMBIO/MN_TIPO_CAMBIO4/DOLAR_OBS_ADO"
-
-    if requests is None:
-        return None, "No está instalada la librería requests."
-
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Accept-Language": "es-CL,es;q=0.9,en;q=0.8",
-        }
-        resp = requests.get(url, headers=headers, timeout=20)
-        resp.raise_for_status()
-        html = resp.text
-
-        # Intento 1: extraer el bloque del cuadro y tomar el último valor publicado
-        bloque = re.search(
-            r"D[óo]lar observado(.*?)(?:Eliminar canasta|Exportar a Excel|Mi BDE)",
-            html,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        if bloque:
-            valores = re.findall(r"\d{1,3}(?:\.\d{3})*,\d{2}", bloque.group(1))
-            if valores:
-                valor = texto_a_float_chileno(valores[-1])
-                if valor is not None:
-                    return valor, "Fuente: Banco Central de Chile"
-
-        # Intento 2: leer tablas HTML si el sitio entrega la tabla renderizada
-        try:
-            tablas = pd.read_html(StringIO(html))
-            for tabla in tablas:
-                tabla = tabla.copy()
-                for _, fila in tabla.iterrows():
-                    fila_txt = " | ".join(fila.astype(str).tolist()).lower()
-                    if "dólar observado" in fila_txt or "dolar observado" in fila_txt:
-                        for valor_txt in reversed(fila.astype(str).tolist()):
-                            valor = texto_a_float_chileno(valor_txt)
-                            if valor is not None and valor > 0:
-                                return valor, "Fuente: Banco Central de Chile"
-        except Exception:
-            pass
-
-        return None, "No fue posible identificar el valor publicado en el sitio del Banco Central."
-
-    except Exception as e:
-        return None, f"No fue posible consultar el Banco Central: {e}"
-
-
 def limpiar_nombre_archivo(texto):
     texto = str(texto).strip().replace(" ", "_")
     reemplazos = {
@@ -330,56 +252,6 @@ def normalizar_columnas(df):
         c_norm = normalizar_texto(c)
         nuevas[c] = c_norm
     return df.rename(columns=nuevas)
-# =========================================================
-# GOOGLE SHEETS - HISTORIAL
-# =========================================================
-GSHEET_SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
-]
-
-@st.cache_resource
-def get_gsheet_client():
-    creds_info = dict(st.secrets["gsheets"]["service_account"])
-    if "private_key" in creds_info:
-        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
-
-    creds = Credentials.from_service_account_info(
-        creds_info,
-        scopes=GSHEET_SCOPES
-    )
-    return gspread.authorize(creds)
-
-@st.cache_resource
-def get_gsheet():
-    client = get_gsheet_client()
-    return client.open_by_key("12iAqv8Gj6a3LRgTg95oJFS5ip1FSVetM2Q62ozuNGs4")
-
-def asegurar_hoja_historial():
-    sh = get_gsheet()
-    try:
-        ws = sh.worksheet("HistorialCotizaciones")
-    except Exception:
-        ws = sh.add_worksheet(title="HistorialCotizaciones", rows=2000, cols=20)
-        ws.append_row([
-            "id",
-            "fecha",
-            "cliente",
-            "cotizante",
-            "prefijo",
-            "correlativo",
-            "numero_cotizacion",
-            "modelo",
-            "capacidad_bateria",
-            "cantidad_unidades",
-            "precio_unitario",
-            "total_negocio",
-            "lugar_entrega",
-            "contrato_mantto",
-            "texto_mantto",
-            "creado_en",
-        ])
-    return ws
 # =========================================================
 # BASE DE DATOS
 # =========================================================
@@ -512,16 +384,16 @@ def init_db():
 
 def siguiente_correlativo(cotizante):
     prefijo = COTIZANTES[cotizante]["prefijo"]
-    ws = asegurar_hoja_historial()
-    registros = ws.get_all_records()
-
-    usados = []
-    for row in registros:
-        try:
-            if str(row.get("prefijo", "")).strip() == prefijo:
-                usados.append(int(row.get("correlativo", 0)))
-        except Exception:
-            pass
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT correlativo
+        FROM cotizaciones
+        WHERE prefijo = ?
+        ORDER BY correlativo ASC
+    """, (prefijo,))
+    usados = [row[0] for row in cur.fetchall() if row[0] is not None]
+    conn.close()
 
     correlativo = 1
     while correlativo in usados:
@@ -530,23 +402,18 @@ def siguiente_correlativo(cotizante):
 
 
 def guardar_cotizacion(data):
-    ws = asegurar_hoja_historial()
-    registros = ws.get_all_records()
+    conn = get_conn()
+    cur = conn.cursor()
     creado_en = ahora_santiago().strftime("%Y-%m-%d %H:%M:%S")
 
-    next_id = 1
-    if registros:
-        ids = []
-        for r in registros:
-            try:
-                ids.append(int(r.get("id", 0)))
-            except Exception:
-                pass
-        if ids:
-            next_id = max(ids) + 1
-
-    ws.append_row([
-        next_id,
+    cur.execute("""
+        INSERT INTO cotizaciones (
+            fecha, cliente, cotizante, prefijo, correlativo, numero_cotizacion,
+            modelo, capacidad_bateria, cantidad_unidades, precio_unitario, total_negocio,
+            lugar_entrega, contrato_mantto, texto_mantto, creado_en
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
         data["fecha_iso"],
         data["cliente"],
         data["cotizante"],
@@ -562,74 +429,40 @@ def guardar_cotizacion(data):
         data["contrato_mantto"],
         data["texto_mantto"],
         creado_en,
-    ])
+    ))
+    conn.commit()
+    conn.close()
 
 
 def cargar_historial():
-    ws = asegurar_hoja_historial()
-    registros = ws.get_all_records()
-
-    if not registros:
-        return pd.DataFrame(columns=[
-            "id",
-            "fecha",
-            "cliente",
-            "cotizante",
-            "numero_cotizacion",
-            "modelo",
-            "cantidad_unidades",
-            "precio_unitario",
-            "total_negocio",
-            "capacidad_bateria",
-            "lugar_entrega",
-            "creado_en",
-        ])
-
-    df = pd.DataFrame(registros)
-
-    columnas_esperadas = [
-        "id",
-        "fecha",
-        "cliente",
-        "cotizante",
-        "numero_cotizacion",
-        "modelo",
-        "cantidad_unidades",
-        "precio_unitario",
-        "total_negocio",
-        "capacidad_bateria",
-        "lugar_entrega",
-        "creado_en",
-    ]
-
-    for c in columnas_esperadas:
-        if c not in df.columns:
-            df[c] = ""
-
-    return df[columnas_esperadas].sort_values("id", ascending=False)
+    conn = get_conn()
+    df = pd.read_sql_query("""
+        SELECT
+            id,
+            fecha,
+            cliente,
+            cotizante,
+            numero_cotizacion,
+            modelo,
+            cantidad_unidades,
+            precio_unitario,
+            total_negocio,
+            COALESCE(capacidad_bateria, '') AS capacidad_bateria,
+            COALESCE(lugar_entrega, '') AS lugar_entrega,
+            COALESCE(creado_en, '') AS creado_en
+        FROM cotizaciones
+        ORDER BY id DESC
+    """, conn)
+    conn.close()
+    return df
 
 
 def eliminar_cotizacion_por_id(cotizacion_id):
-    ws = asegurar_hoja_historial()
-    values = ws.get_all_values()
-
-    if not values or len(values) < 2:
-        return
-
-    header = values[0]
-    filas = values[1:]
-
-    nuevas_filas = [header]
-
-    for fila in filas:
-        try:
-            if int(fila[0]) != int(cotizacion_id):
-                nuevas_filas.append(fila)
-        except Exception:
-            nuevas_filas.append(fila)
-
-    ws.clear()
-    ws.update("A1", nuevas_filas)
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM cotizaciones WHERE id = ?", (cotizacion_id,))
+    conn.commit()
+    conn.close()
 
 # =========================================================
 # DOCX / PDF
@@ -1543,17 +1376,10 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             )
 
         with csel2:
-            dolar_bcch, mensaje_dolar = obtener_dolar_observado_bcch()
-
-            if dolar_bcch is not None:
-                st.caption(f"{mensaje_dolar}: {clp_fmt(dolar_bcch, decimales=2)}")
-            else:
-                st.warning(mensaje_dolar)
-
             dolar_observado = st.number_input(
                 "Dólar observado CLP",
                 min_value=1.0,
-                value=float(dolar_bcch) if dolar_bcch is not None else 950.0,
+                value=950.0,
                 step=1.0,
                 disabled=not puede_editar_costos,
                 key="dolar_observado_tab5"
@@ -1641,7 +1467,7 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             st.metric("Precio Venta Dealer", usd_fmt(precio_venta_dealer_usd))
 
         with k4:
-            st.metric("Dólar observado", clp_fmt(dolar_observado))
+            st.metric("Dólar observado", f"CLP {dolar_observado:,.0f}".replace(",", "."))
 
         st.markdown("### Objetivos de venta sobre valor final")
 
@@ -1669,8 +1495,8 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         df_objetivos_vista = df_objetivos.copy()
         df_objetivos_vista["USD sin IVA"] = df_objetivos_vista["USD sin IVA"].apply(usd_fmt)
         df_objetivos_vista["USD con IVA"] = df_objetivos_vista["USD con IVA"].apply(usd_fmt)
-        df_objetivos_vista["CLP sin IVA"] = df_objetivos_vista["CLP sin IVA"].apply(clp_fmt)
-        df_objetivos_vista["CLP con IVA"] = df_objetivos_vista["CLP con IVA"].apply(clp_fmt)
+        df_objetivos_vista["CLP sin IVA"] = df_objetivos_vista["CLP sin IVA"].apply(lambda x: f"CLP {x:,.0f}".replace(",", "."))
+        df_objetivos_vista["CLP con IVA"] = df_objetivos_vista["CLP con IVA"].apply(lambda x: f"CLP {x:,.0f}".replace(",", "."))
 
         st.dataframe(df_objetivos_vista, use_container_width=True)
 
@@ -1708,7 +1534,7 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
                 f"{margen_dealer_pct:.1f}%",
                 usd_fmt(bono_vendedor_interno),
                 usd_fmt(precio_venta_dealer_usd),
-                clp_fmt(dolar_observado),
+                f"CLP {dolar_observado:,.0f}".replace(",", "."),
                 f"{iva_pct:.1f}%"
             ]
         })
