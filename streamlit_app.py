@@ -488,9 +488,7 @@ def guardar_cotizacion(data):
         data["texto_mantto"],
         creado_en,
     ])
-    conn.commit()
-    conn.close()
-
+   
 
 def cargar_historial():
     ws = asegurar_hoja_historial()
