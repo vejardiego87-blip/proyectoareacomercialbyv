@@ -1517,86 +1517,52 @@ with tab_dash:
         st.error(f"Error dashboard: {e}")
         
 # =========================================================
-# TAB 5 - ESTRUCTURA DE COSTO
+# TAB 5 - ESTRUCTURA DE COSTO - CALCULADORA IVECO
 # =========================================================
 if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
     with tab_cost:
-        st.subheader("Estructura de costo")
-
-        puede_editar_costos = st.session_state.usuario in {"forellana", "dvejar"}
+        st.subheader("Calculadora comercial - Estructura de costo")
 
         ARCHIVO_COSTOS = os.path.join("data", "Estructura de costos.xlsx")
 
-        def cargar_hojas_costos():
-            if not os.path.exists(ARCHIVO_COSTOS):
-                return None, None
+        if not os.path.exists(ARCHIVO_COSTOS):
+            st.error(f"No se encontró el archivo de costos en: {ARCHIVO_COSTOS}")
+            st.stop()
 
-            xls = pd.ExcelFile(ARCHIVO_COSTOS)
-            hojas_validas = [h for h in xls.sheet_names if h.strip().upper() in {"IVECO", "FOTON", "AGRALE"}]
-            return xls, hojas_validas
+        def to_num(valor):
+            try:
+                if valor is None or str(valor).strip() == "":
+                    return 0.0
+                return float(str(valor).replace("$", "").replace(".", "").replace(",", ".").strip())
+            except Exception:
+                try:
+                    return float(valor)
+                except Exception:
+                    return 0.0
 
-        def leer_hoja_costos(archivo, hoja):
-            # header=None para respetar la estructura visual original
-            df = pd.read_excel(archivo, sheet_name=hoja, header=None)
-            df = df.fillna("")
-            return df
+        def fmt_usd(valor):
+            return f"USD {valor:,.0f}".replace(",", ".")
 
-        def detectar_dolar_desde_hoja(df):
-            for i in range(df.shape[0]):
-                for j in range(df.shape[1]):
-                    valor = str(df.iat[i, j]).strip().upper()
-                    if valor == "DOLAR":
-                        if j + 1 < df.shape[1]:
-                            candidato = df.iat[i, j + 1]
-                            try:
-                                return float(candidato)
-                            except Exception:
-                                pass
-                        if i + 1 < df.shape[0]:
-                            candidato = df.iat[i + 1, j]
-                            try:
-                                return float(candidato)
-                            except Exception:
-                                pass
-            return None
+        def fmt_clp(valor):
+            return f"CLP {valor:,.0f}".replace(",", ".")
 
-        def detectar_fila_encabezados(df):
-            mejor_fila = 0
-            mejor_score = -1
+        def cargar_tabla_marca(hoja):
+            df_raw = pd.read_excel(ARCHIVO_COSTOS, sheet_name=hoja, header=None).fillna("")
 
-            claves = [
-                "modelo",
-                "variante",
-                "valor ex fabrica",
-                "flete",
-                "pdi",
-                "total costo",
-                "precio lista",
-                "precio lista usd",
-                "margen importer",
-                "precio venta dealer",
-                "observaciones",
-            ]
-
-            for i in range(min(15, len(df))):
-                fila_texto = " | ".join([str(x).strip().lower() for x in df.iloc[i].tolist()])
-                score = sum(1 for k in claves if k in fila_texto)
-                if score > mejor_score:
-                    mejor_score = score
-                    mejor_fila = i
-
-            return mejor_fila
-
-        def construir_tabla_desde_hoja(df):
-            fila_header = detectar_fila_encabezados(df)
-            headers_raw = df.iloc[fila_header].tolist()
+            # detectar fila de encabezados
+            fila_header = 0
+            for i in range(min(15, len(df_raw))):
+                fila_txt = " | ".join(df_raw.iloc[i].astype(str).str.lower().tolist())
+                if "modelo" in fila_txt and "total costo" in fila_txt:
+                    fila_header = i
+                    break
 
             headers = []
             usados = {}
 
-            for idx, h in enumerate(headers_raw):
+            for idx, h in enumerate(df_raw.iloc[fila_header].tolist()):
                 nombre = str(h).strip()
-                if nombre == "" or nombre.lower().startswith("unnamed"):
+                if nombre == "":
                     nombre = f"col_{idx}"
 
                 if nombre in usados:
@@ -1607,127 +1573,255 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
 
                 headers.append(nombre)
 
-            tabla = df.iloc[fila_header + 1:].copy()
-            tabla.columns = headers
+            df = df_raw.iloc[fila_header + 1:].copy()
+            df.columns = headers
 
-            # quitar filas completamente vacías
-            tabla = tabla.loc[
-                ~(tabla.apply(lambda row: all(str(x).strip() == "" for x in row), axis=1))
+            # limpiar filas vacías
+            df = df.loc[
+                ~(df.apply(lambda row: all(str(x).strip() == "" for x in row), axis=1))
             ].copy()
 
-            return tabla, fila_header, headers
+            return df
 
-        def guardar_tabla_en_excel(tabla_editada, hoja, fila_header_original, headers_originales):
-            # Leemos la hoja original para no romper su forma
-            df_original = pd.read_excel(ARCHIVO_COSTOS, sheet_name=hoja, header=None).fillna("")
+        def buscar_col(df, texto):
+            texto = texto.lower()
+            for c in df.columns:
+                if texto in str(c).lower():
+                    return c
+            return None
 
-            # reconstruimos desde la fila siguiente al encabezado detectado
-            start_row = fila_header_original + 1
+        marca = st.selectbox(
+            "Marca",
+            ["IVECO"],
+            key="marca_calculadora_costos"
+        )
 
-            # respetar cantidad de columnas originales
-            ncols = len(headers_originales)
+        df_base = cargar_tabla_marca("IVECO")
 
-            # limpiar contenido antiguo debajo de encabezado
-            df_salida = df_original.copy()
+        col_modelo = buscar_col(df_base, "modelo")
+        col_variante = buscar_col(df_base, "variante")
+        col_costo_usd = buscar_col(df_base, "total costo us")
+        col_costo_clp = buscar_col(df_base, "total costo $")
+        col_precio_lista = buscar_col(df_base, "precio lista usd")
+        col_precio_dealer = buscar_col(df_base, "precio venta dealer")
+        col_margen_importer = buscar_col(df_base, "margen importer")
+        col_margen_importer_pct = buscar_col(df_base, "margen importer %")
+        col_dealer_pct = buscar_col(df_base, "dealer ccs")
+        col_bono = buscar_col(df_base, "bono vendedor")
 
-            while len(df_salida) < start_row:
-                df_salida.loc[len(df_salida)] = [""] * df_salida.shape[1]
+        # dejar solo filas que realmente tengan modelo y costo
+        df_modelos = df_base.copy()
+        df_modelos = df_modelos[df_modelos[col_modelo].astype(str).str.strip() != ""]
+        df_modelos["_costo_usd"] = df_modelos[col_costo_usd].apply(to_num) if col_costo_usd else 0
+        df_modelos = df_modelos[df_modelos["_costo_usd"] > 0]
 
-            # recortar o expandir columnas si hace falta
-            if df_salida.shape[1] < ncols:
-                for _ in range(ncols - df_salida.shape[1]):
-                    df_salida[df_salida.shape[1]] = ""
-
-            # borrar bloque antiguo desde start_row hacia abajo
-            df_salida = df_salida.iloc[:start_row].copy()
-
-            # agregar nueva tabla
-            tabla_out = tabla_editada.copy().fillna("")
-            tabla_out = tabla_out.reindex(columns=headers_originales, fill_value="")
-
-            for _, row in tabla_out.iterrows():
-                df_salida.loc[len(df_salida)] = row.tolist()
-
-            # guardar todo el workbook respetando otras hojas
-            with pd.ExcelWriter(
-                ARCHIVO_COSTOS,
-                engine="openpyxl",
-                mode="a",
-                if_sheet_exists="replace"
-            ) as writer:
-                # primero reescribimos todas las hojas copiando desde el workbook actual
-                xls_tmp = pd.ExcelFile(ARCHIVO_COSTOS)
-                for sh in xls_tmp.sheet_names:
-                    if sh != hoja:
-                        df_tmp = pd.read_excel(ARCHIVO_COSTOS, sheet_name=sh, header=None)
-                        df_tmp.to_excel(writer, sheet_name=sh, header=False, index=False)
-
-                df_salida.to_excel(writer, sheet_name=hoja, header=False, index=False)
-
-        xls_costos, hojas_costos = cargar_hojas_costos()
-
-        if xls_costos is None:
-            st.error(f"No se encontró el archivo de costos en: {ARCHIVO_COSTOS}")
+        if df_modelos.empty:
+            st.warning("No se encontraron modelos válidos en la hoja IVECO.")
             st.stop()
 
-        hoja_sel = st.selectbox(
-            "Marca / Hoja",
-            hojas_costos,
-            format_func=lambda x: x.strip(),
-            key="hoja_costos_tab5"
+        df_modelos["selector"] = df_modelos.apply(
+            lambda r: f"{r[col_modelo]} | {r[col_variante]}" if col_variante else str(r[col_modelo]),
+            axis=1
         )
 
-        df_hoja = leer_hoja_costos(ARCHIVO_COSTOS, hoja_sel)
-        dolar_hoja = detectar_dolar_desde_hoja(df_hoja)
+        c1, c2, c3 = st.columns([2, 1, 1])
+
+        with c1:
+            seleccion = st.selectbox(
+                "Modelo / Variante",
+                df_modelos["selector"].tolist(),
+                key="selector_modelo_iveco"
+            )
+
+        row = df_modelos[df_modelos["selector"] == seleccion].iloc[0]
+
+        costo_usd = to_num(row[col_costo_usd]) if col_costo_usd else 0
+        costo_clp_base = to_num(row[col_costo_clp]) if col_costo_clp else 0
+        precio_lista_usd = to_num(row[col_precio_lista]) if col_precio_lista else 0
+        precio_dealer_usd = to_num(row[col_precio_dealer]) if col_precio_dealer else precio_lista_usd
+        margen_importer_usd_base = to_num(row[col_margen_importer]) if col_margen_importer else 0
+        margen_importer_pct_base = to_num(row[col_margen_importer_pct]) if col_margen_importer_pct else 0
+        dealer_pct_base = to_num(row[col_dealer_pct]) if col_dealer_pct else 0
+        bono_base = to_num(row[col_bono]) if col_bono else 0
+
         dolar_bcch, mensaje_dolar = obtener_dolar_observado_bcch()
+        dolar_default = float(dolar_bcch) if dolar_bcch else 885.0
 
-        c_top1, c_top2 = st.columns([3, 1])
+        with c2:
+            cantidad = st.number_input(
+                "Cantidad unidades",
+                min_value=1,
+                value=1,
+                step=1,
+                key="cantidad_calculadora_iveco"
+            )
 
-        with c_top1:
-            st.markdown(f"### Hoja seleccionada: {hoja_sel.strip()}")
+        with c3:
+            dolar_usado = st.number_input(
+                "Dólar observado",
+                min_value=1.0,
+                value=dolar_default,
+                step=1.0,
+                key="dolar_calculadora_iveco"
+            )
 
-        with c_top2:
-            valor_dolar_mostrar = dolar_bcch if dolar_bcch is not None else dolar_hoja
-            if valor_dolar_mostrar is not None:
-                st.metric("Dólar referencia", clp_fmt(valor_dolar_mostrar, decimales=2))
-            else:
-                st.warning("No fue posible leer dólar desde BCCh ni desde la hoja.")
+        st.markdown("### Base del modelo")
 
-        tabla_costos, fila_header_original, headers_originales = construir_tabla_desde_hoja(df_hoja)
+        b1, b2, b3, b4 = st.columns(4)
+        b1.metric("Costo unitario USD", fmt_usd(costo_usd))
+        b2.metric("Costo unitario CLP", fmt_clp(costo_usd * dolar_usado))
+        b3.metric("Precio lista USD", fmt_usd(precio_lista_usd))
+        b4.metric("Precio venta dealer USD", fmt_usd(precio_dealer_usd))
 
-        st.markdown("### Base de costos")
-        st.caption("La tabla respeta la estructura base del Excel y funciona como calculadora/base editable.")
+        st.markdown("### Simulación comercial")
 
-        df_edit = st.data_editor(
-            tabla_costos,
-            use_container_width=True,
-            hide_index=True,
-            disabled=not puede_editar_costos,
-            key=f"editor_costos_{hoja_sel}"
+        s1, s2, s3, s4 = st.columns(4)
+
+        with s1:
+            precio_venta_objetivo = st.number_input(
+                "Precio venta objetivo USD",
+                min_value=0.0,
+                value=float(precio_dealer_usd if precio_dealer_usd > 0 else precio_lista_usd),
+                step=500.0,
+                key="precio_objetivo_iveco"
+            )
+
+        with s2:
+            descuento_pct = st.number_input(
+                "Descuento %",
+                min_value=0.0,
+                max_value=100.0,
+                value=0.0,
+                step=0.5,
+                key="descuento_pct_iveco"
+            )
+
+        with s3:
+            descuento_usd_manual = st.number_input(
+                "Descuento adicional USD",
+                min_value=0.0,
+                value=0.0,
+                step=500.0,
+                key="descuento_usd_iveco"
+            )
+
+        with s4:
+            bono_vendedor = st.number_input(
+                "Bono vendedor interno USD",
+                min_value=0.0,
+                value=float(bono_base),
+                step=100.0,
+                key="bono_vendedor_iveco"
+            )
+
+        descuento_pct_usd = precio_venta_objetivo * (descuento_pct / 100)
+        precio_final_unidad = precio_venta_objetivo - descuento_pct_usd - descuento_usd_manual
+        margen_unitario = precio_final_unidad - costo_usd - bono_vendedor
+        margen_pct = (margen_unitario / precio_final_unidad * 100) if precio_final_unidad > 0 else 0
+
+        ingreso_total = precio_final_unidad * cantidad
+        costo_total = costo_usd * cantidad
+        bono_total = bono_vendedor * cantidad
+        margen_total = margen_unitario * cantidad
+
+        st.markdown("### Resultado ejecutivo")
+
+        r1, r2, r3, r4 = st.columns(4)
+        r1.metric("Precio final unidad", fmt_usd(precio_final_unidad))
+        r2.metric("Margen unidad", fmt_usd(margen_unitario))
+        r3.metric("Margen final %", f"{margen_pct:.1f}%")
+        r4.metric("Margen total negocio", fmt_usd(margen_total))
+
+        r5, r6, r7, r8 = st.columns(4)
+        r5.metric("Ingreso total", fmt_usd(ingreso_total))
+        r6.metric("Costo total", fmt_usd(costo_total))
+        r7.metric("Bono total", fmt_usd(bono_total))
+        r8.metric("Precio final CLP unidad", fmt_clp(precio_final_unidad * dolar_usado))
+
+        st.markdown("### Tabla resumen")
+
+        resumen = pd.DataFrame({
+            "Concepto": [
+                "Marca",
+                "Modelo",
+                "Variante",
+                "Cantidad unidades",
+                "Costo unitario USD",
+                "Precio lista USD",
+                "Precio venta dealer USD",
+                "Precio venta objetivo USD",
+                "Descuento %",
+                "Descuento USD por %",
+                "Descuento adicional USD",
+                "Bono vendedor USD",
+                "Precio final unidad USD",
+                "Margen unitario USD",
+                "Margen final %",
+                "Ingreso total USD",
+                "Costo total USD",
+                "Margen total negocio USD",
+                "Dólar utilizado",
+                "Precio final unidad CLP",
+            ],
+            "Valor": [
+                "IVECO",
+                row[col_modelo],
+                row[col_variante] if col_variante else "",
+                cantidad,
+                fmt_usd(costo_usd),
+                fmt_usd(precio_lista_usd),
+                fmt_usd(precio_dealer_usd),
+                fmt_usd(precio_venta_objetivo),
+                f"{descuento_pct:.1f}%",
+                fmt_usd(descuento_pct_usd),
+                fmt_usd(descuento_usd_manual),
+                fmt_usd(bono_vendedor),
+                fmt_usd(precio_final_unidad),
+                fmt_usd(margen_unitario),
+                f"{margen_pct:.1f}%",
+                fmt_usd(ingreso_total),
+                fmt_usd(costo_total),
+                fmt_usd(margen_total),
+                fmt_clp(dolar_usado, decimales=2),
+                fmt_clp(precio_final_unidad * dolar_usado),
+            ]
+        })
+
+        st.dataframe(resumen, use_container_width=True, hide_index=True)
+
+        st.markdown("### Objetivos de precio sobre costo")
+
+        objetivos = []
+        for pct in [5, 10, 15, 20]:
+            precio_obj = costo_usd * (1 + pct / 100)
+            margen_obj = precio_obj - costo_usd
+            objetivos.append({
+                "Objetivo": f"+{pct}%",
+                "Precio objetivo USD": precio_obj,
+                "Precio objetivo CLP": precio_obj * dolar_usado,
+                "Margen unitario USD": margen_obj,
+                "Margen total negocio USD": margen_obj * cantidad,
+            })
+
+        df_obj = pd.DataFrame(objetivos)
+        df_obj_v = df_obj.copy()
+        df_obj_v["Precio objetivo USD"] = df_obj_v["Precio objetivo USD"].apply(fmt_usd)
+        df_obj_v["Precio objetivo CLP"] = df_obj_v["Precio objetivo CLP"].apply(fmt_clp)
+        df_obj_v["Margen unitario USD"] = df_obj_v["Margen unitario USD"].apply(fmt_usd)
+        df_obj_v["Margen total negocio USD"] = df_obj_v["Margen total negocio USD"].apply(fmt_usd)
+
+        st.dataframe(df_obj_v, use_container_width=True, hide_index=True)
+
+        fig_obj = px.bar(
+            df_obj,
+            x="Objetivo",
+            y="Precio objetivo USD",
+            text="Precio objetivo USD",
+            title="Objetivos de precio sobre costo unitario"
         )
+        fig_obj.update_traces(texttemplate="%{y:,.0f}", textposition="outside")
+        fig_obj.update_layout(height=380)
+        st.plotly_chart(fig_obj, use_container_width=True)
 
-        c_btn1, c_btn2 = st.columns([1, 3])
-
-        with c_btn1:
-            if puede_editar_costos:
-                if st.button("Guardar base", key=f"guardar_base_{hoja_sel}"):
-                    try:
-                        guardar_tabla_en_excel(df_edit, hoja_sel, fila_header_original, headers_originales)
-                        st.success(f"Base de {hoja_sel.strip()} guardada correctamente.")
-                    except Exception as e:
-                        st.error(f"No fue posible guardar la base: {e}")
-
-        with c_btn2:
-            if not puede_editar_costos:
-                st.info("Este usuario tiene acceso solo de visualización.")
-
-        st.markdown("### Vista original de la hoja")
-        st.dataframe(df_hoja, use_container_width=True, hide_index=True)
-
-        if hoja_sel.strip().upper() == "IVECO":
-            st.markdown("### Comparativa competencia")
-            try:
-                df_comp = pd.read_excel(ARCHIVO_COSTOS, sheet_name="Comparativa competencia", header=None).fillna("")
-                st.dataframe(df_comp, use_container_width=True, hide_index=True)
-            except Exception as e:
-                st.warning(f"No fue posible cargar la hoja de comparativa: {e}")
+        with st.expander("Ver base original IVECO"):
+            st.dataframe(df_modelos.drop(columns=["_costo_usd", "selector"]), use_container_width=True, hide_index=True)
