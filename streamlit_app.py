@@ -1521,7 +1521,9 @@ with tab_dash:
 # =========================================================
 if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
     with tab_cost:
-        st.subheader("Calculadora comercial - Estructura de costo")
+        st.subheader("Calculadora comercial - IVECO")
+
+        puede_editar_costos = st.session_state.usuario in {"forellana", "dvejar"}
 
         ARCHIVO_COSTOS = os.path.join("data", "Estructura de costos.xlsx")
 
@@ -1533,7 +1535,12 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             try:
                 if valor is None or str(valor).strip() == "":
                     return 0.0
-                return float(str(valor).replace("$", "").replace(".", "").replace(",", ".").strip())
+                txt = str(valor)
+                txt = txt.replace("USD", "")
+                txt = txt.replace("$", "")
+                txt = txt.replace(".", "")
+                txt = txt.replace(",", ".")
+                return float(txt.strip())
             except Exception:
                 try:
                     return float(valor)
@@ -1546,282 +1553,357 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         def fmt_clp(valor):
             return f"CLP {valor:,.0f}".replace(",", ".")
 
-        def cargar_tabla_marca(hoja):
-            df_raw = pd.read_excel(ARCHIVO_COSTOS, sheet_name=hoja, header=None).fillna("")
+        @st.cache_data(show_spinner=False)
+        def cargar_iveco_desde_excel(archivo):
+            df = pd.read_excel(archivo, sheet_name="IVECO", header=None).fillna("")
 
-            # detectar fila de encabezados
-            fila_header = 0
-            for i in range(min(15, len(df_raw))):
-                fila_txt = " | ".join(df_raw.iloc[i].astype(str).str.lower().tolist())
-                if "modelo" in fila_txt and "total costo" in fila_txt:
-                    fila_header = i
-                    break
+            variables = df.iloc[:, 0].astype(str).str.strip().tolist()
 
-            headers = []
-            usados = {}
+            columnas_modelos = []
+            for col in range(1, df.shape[1]):
+                modelo = str(df.iat[1, col]).strip()
+                if modelo != "":
+                    columnas_modelos.append(col)
 
-            for idx, h in enumerate(df_raw.iloc[fila_header].tolist()):
-                nombre = str(h).strip()
-                if nombre == "":
-                    nombre = f"col_{idx}"
+            registros = []
 
-                if nombre in usados:
-                    usados[nombre] += 1
-                    nombre = f"{nombre}_{usados[nombre]}"
-                else:
-                    usados[nombre] = 0
+            for col in columnas_modelos:
+                modelo = str(df.iat[1, col]).strip()
 
-                headers.append(nombre)
+                grupo = "Stock antiguo IVECO" if col <= 10 else "Nuevos pedidos EURO VI IVECO"
 
-            df = df_raw.iloc[fila_header + 1:].copy()
-            df.columns = headers
+                data = {
+                    "grupo": grupo,
+                    "col_excel": col,
+                    "modelo": modelo,
+                }
 
-            # limpiar filas vacías
-            df = df.loc[
-                ~(df.apply(lambda row: all(str(x).strip() == "" for x in row), axis=1))
-            ].copy()
+                for fila in range(df.shape[0]):
+                    variable = str(df.iat[fila, 0]).strip()
+                    if variable != "":
+                        data[variable] = df.iat[fila, col]
 
-            return df
+                registros.append(data)
 
-        def buscar_col(df, texto):
-            texto = texto.lower()
-            for c in df.columns:
-                if texto in str(c).lower():
-                    return c
-            return None
+            return pd.DataFrame(registros)
 
-        marca = st.selectbox(
-            "Marca",
-            ["IVECO"],
-            key="marca_calculadora_costos"
-        )
+        df_iveco = cargar_iveco_desde_excel(ARCHIVO_COSTOS)
 
-        df_base = cargar_tabla_marca("IVECO")
-
-        col_modelo = buscar_col(df_base, "modelo")
-        col_variante = buscar_col(df_base, "variante")
-        col_costo_usd = buscar_col(df_base, "total costo us")
-        col_costo_clp = buscar_col(df_base, "total costo $")
-        col_precio_lista = buscar_col(df_base, "precio lista usd")
-        col_precio_dealer = buscar_col(df_base, "precio venta dealer")
-        col_margen_importer = buscar_col(df_base, "margen importer")
-        col_margen_importer_pct = buscar_col(df_base, "margen importer %")
-        col_dealer_pct = buscar_col(df_base, "dealer ccs")
-        col_bono = buscar_col(df_base, "bono vendedor")
-
-        # dejar solo filas que realmente tengan modelo y costo
-        df_modelos = df_base.copy()
-        df_modelos = df_modelos[df_modelos[col_modelo].astype(str).str.strip() != ""]
-        df_modelos["_costo_usd"] = df_modelos[col_costo_usd].apply(to_num) if col_costo_usd else 0
-        df_modelos = df_modelos[df_modelos["_costo_usd"] > 0]
-
-        if df_modelos.empty:
-            st.warning("No se encontraron modelos válidos en la hoja IVECO.")
+        if df_iveco.empty:
+            st.warning("No se encontraron modelos IVECO válidos en el archivo.")
             st.stop()
 
-        df_modelos["selector"] = df_modelos.apply(
-            lambda r: f"{r[col_modelo]} | {r[col_variante]}" if col_variante else str(r[col_modelo]),
-            axis=1
-        )
+        col_grupo, col_modelo = st.columns([1, 2])
 
-        c1, c2, c3 = st.columns([2, 1, 1])
-
-        with c1:
-            seleccion = st.selectbox(
-                "Modelo / Variante",
-                df_modelos["selector"].tolist(),
-                key="selector_modelo_iveco"
+        with col_grupo:
+            grupo_sel = st.selectbox(
+                "Grupo",
+                sorted(df_iveco["grupo"].unique()),
+                key="grupo_iveco_calc"
             )
 
-        row = df_modelos[df_modelos["selector"] == seleccion].iloc[0]
+        df_filtrado = df_iveco[df_iveco["grupo"] == grupo_sel].copy()
 
-        costo_usd = to_num(row[col_costo_usd]) if col_costo_usd else 0
-        costo_clp_base = to_num(row[col_costo_clp]) if col_costo_clp else 0
-        precio_lista_usd = to_num(row[col_precio_lista]) if col_precio_lista else 0
-        precio_dealer_usd = to_num(row[col_precio_dealer]) if col_precio_dealer else precio_lista_usd
-        margen_importer_usd_base = to_num(row[col_margen_importer]) if col_margen_importer else 0
-        margen_importer_pct_base = to_num(row[col_margen_importer_pct]) if col_margen_importer_pct else 0
-        dealer_pct_base = to_num(row[col_dealer_pct]) if col_dealer_pct else 0
-        bono_base = to_num(row[col_bono]) if col_bono else 0
+        with col_modelo:
+            modelo_sel = st.selectbox(
+                "Modelo",
+                df_filtrado["modelo"].tolist(),
+                key="modelo_iveco_calc"
+            )
+
+        row = df_filtrado[df_filtrado["modelo"] == modelo_sel].iloc[0]
 
         dolar_bcch, mensaje_dolar = obtener_dolar_observado_bcch()
-        dolar_default = float(dolar_bcch) if dolar_bcch else 885.0
+        dolar_base = float(dolar_bcch) if dolar_bcch else 885.0
+
+        st.markdown("### Datos base del modelo")
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
+            valor_fabrica = st.number_input(
+                "Valor ex fábrica USD",
+                value=to_num(row.get("Valor ex fabrica", 0)),
+                step=500.0,
+                disabled=not puede_editar_costos,
+                key="valor_fabrica_iveco"
+            )
+
+            flete_seguro = st.number_input(
+                "Flete + seguro USD",
+                value=to_num(row.get("Flete + seguro", 0)),
+                step=100.0,
+                disabled=not puede_editar_costos,
+                key="flete_seguro_iveco"
+            )
 
         with c2:
-            cantidad = st.number_input(
-                "Cantidad unidades",
-                min_value=1,
-                value=1,
-                step=1,
-                key="cantidad_calculadora_iveco"
+            impuesto_flete = st.number_input(
+                "Impuesto flete puerto USD",
+                value=to_num(row.get("Impuesto Flete puerto", 0)),
+                step=50.0,
+                disabled=not puede_editar_costos,
+                key="impuesto_flete_iveco"
+            )
+
+            pdi = st.number_input(
+                "PDI USD",
+                value=to_num(row.get("PDI", 0)),
+                step=50.0,
+                disabled=not puede_editar_costos,
+                key="pdi_iveco"
             )
 
         with c3:
-            dolar_usado = st.number_input(
-                "Dólar observado",
-                min_value=1.0,
-                value=dolar_default,
-                step=1.0,
-                key="dolar_calculadora_iveco"
+            flete_interno = st.number_input(
+                "Flete interno USD",
+                value=to_num(row.get("Flete interno", 0)),
+                step=50.0,
+                disabled=not puede_editar_costos,
+                key="flete_interno_iveco"
             )
 
-        st.markdown("### Base del modelo")
+            comision_vendedor = st.number_input(
+                "Comisión vendedor USD",
+                value=to_num(row.get("Comisión vendedor", 0)),
+                step=50.0,
+                disabled=not puede_editar_costos,
+                key="comision_vendedor_iveco"
+            )
 
-        b1, b2, b3, b4 = st.columns(4)
-        b1.metric("Costo unitario USD", fmt_usd(costo_usd))
-        b2.metric("Costo unitario CLP", fmt_clp(costo_usd * dolar_usado))
-        b3.metric("Precio lista USD", fmt_usd(precio_lista_usd))
-        b4.metric("Precio venta dealer USD", fmt_usd(precio_dealer_usd))
+        with c4:
+            insonorizacion = st.number_input(
+                "Insonorización y refuerzos USD",
+                value=to_num(row.get("Inzonorización y refuerzos", 0)),
+                step=100.0,
+                disabled=not puede_editar_costos,
+                key="insonorizacion_iveco"
+            )
 
-        st.markdown("### Simulación comercial")
+            equipamiento = st.number_input(
+                "EE.EE / asientos / equipamiento USD",
+                value=to_num(row.get("EE.EE (asientos y equipamiento )", 0)),
+                step=100.0,
+                disabled=not puede_editar_costos,
+                key="equipamiento_iveco"
+            )
+
+        st.markdown("### Parámetros comerciales")
+
+        p1, p2, p3, p4 = st.columns(4)
+
+        total_costo_usd = (
+            valor_fabrica
+            + flete_seguro
+            + impuesto_flete
+            + pdi
+            + flete_interno
+            + comision_vendedor
+            + insonorizacion
+            + equipamiento
+        )
+
+        with p1:
+            dolar_usado = st.number_input(
+                "Dólar utilizado",
+                value=dolar_base,
+                step=1.0,
+                disabled=not puede_editar_costos,
+                key="dolar_iveco_calc"
+            )
+
+        with p2:
+            mg_bruto_pct = st.number_input(
+                "% Mg Bruto",
+                value=to_num(row.get("% Mg Bruto", 0)) * 100,
+                step=0.5,
+                disabled=not puede_editar_costos,
+                key="mg_bruto_iveco"
+            )
+
+        with p3:
+            mg_dealer_pct = st.number_input(
+                "% Mg Dealer CCS",
+                value=to_num(row.get("% Mg Dealer CCS", 0)) * 100,
+                step=0.5,
+                disabled=not puede_editar_costos,
+                key="mg_dealer_iveco"
+            )
+
+        with p4:
+            bono_vendedor_clp = st.number_input(
+                "Bono vendedor interno CLP",
+                value=to_num(row.get("Bono vendedor intertno", 0)),
+                step=50000.0,
+                disabled=not puede_editar_costos,
+                key="bono_vendedor_iveco"
+            )
+
+        precio_lista_usd = (
+            total_costo_usd / (1 - mg_bruto_pct / 100)
+            if mg_bruto_pct < 100 else 0
+        )
+
+        precio_lista_clp = precio_lista_usd * dolar_usado
+
+        precio_venta_dealer_base = precio_lista_usd * (1 - mg_dealer_pct / 100)
+
+        st.markdown("### Simulación de precio de venta")
 
         s1, s2, s3, s4 = st.columns(4)
 
         with s1:
-            precio_venta_objetivo = st.number_input(
-                "Precio venta objetivo USD",
-                min_value=0.0,
-                value=float(precio_dealer_usd if precio_dealer_usd > 0 else precio_lista_usd),
+            precio_venta_dealer = st.number_input(
+                "Precio venta dealer USD",
+                value=float(precio_venta_dealer_base),
                 step=500.0,
-                key="precio_objetivo_iveco"
+                disabled=not puede_editar_costos,
+                key="precio_venta_dealer_iveco"
             )
 
         with s2:
             descuento_pct = st.number_input(
-                "Descuento %",
+                "Descuento sobre precio dealer %",
+                value=0.0,
                 min_value=0.0,
                 max_value=100.0,
-                value=0.0,
                 step=0.5,
+                disabled=not puede_editar_costos,
                 key="descuento_pct_iveco"
             )
 
         with s3:
-            descuento_usd_manual = st.number_input(
+            descuento_usd = st.number_input(
                 "Descuento adicional USD",
-                min_value=0.0,
                 value=0.0,
+                min_value=0.0,
                 step=500.0,
+                disabled=not puede_editar_costos,
                 key="descuento_usd_iveco"
             )
 
         with s4:
-            bono_vendedor = st.number_input(
-                "Bono vendedor interno USD",
-                min_value=0.0,
-                value=float(bono_base),
-                step=100.0,
-                key="bono_vendedor_iveco"
+            cantidad = st.number_input(
+                "Cantidad unidades",
+                value=1,
+                min_value=1,
+                step=1,
+                disabled=not puede_editar_costos,
+                key="cantidad_iveco_calc"
             )
 
-        descuento_pct_usd = precio_venta_objetivo * (descuento_pct / 100)
-        precio_final_unidad = precio_venta_objetivo - descuento_pct_usd - descuento_usd_manual
-        margen_unitario = precio_final_unidad - costo_usd - bono_vendedor
-        margen_pct = (margen_unitario / precio_final_unidad * 100) if precio_final_unidad > 0 else 0
+        descuento_pct_usd = precio_venta_dealer * (descuento_pct / 100)
+        precio_final_unidad = precio_venta_dealer - descuento_pct_usd - descuento_usd
+
+        margen_importer_unitario = precio_final_unidad - total_costo_usd
+        margen_importer_pct_final = (
+            margen_importer_unitario / precio_final_unidad * 100
+            if precio_final_unidad > 0 else 0
+        )
 
         ingreso_total = precio_final_unidad * cantidad
-        costo_total = costo_usd * cantidad
-        bono_total = bono_vendedor * cantidad
-        margen_total = margen_unitario * cantidad
+        costo_total_negocio = total_costo_usd * cantidad
+        margen_total_negocio = margen_importer_unitario * cantidad
 
         st.markdown("### Resultado ejecutivo")
 
         r1, r2, r3, r4 = st.columns(4)
-        r1.metric("Precio final unidad", fmt_usd(precio_final_unidad))
-        r2.metric("Margen unidad", fmt_usd(margen_unitario))
-        r3.metric("Margen final %", f"{margen_pct:.1f}%")
-        r4.metric("Margen total negocio", fmt_usd(margen_total))
+        r1.metric("Total costo unitario", fmt_usd(total_costo_usd))
+        r2.metric("Precio lista USD", fmt_usd(precio_lista_usd))
+        r3.metric("Precio final unidad", fmt_usd(precio_final_unidad))
+        r4.metric("Margen unitario", fmt_usd(margen_importer_unitario))
 
         r5, r6, r7, r8 = st.columns(4)
-        r5.metric("Ingreso total", fmt_usd(ingreso_total))
-        r6.metric("Costo total", fmt_usd(costo_total))
-        r7.metric("Bono total", fmt_usd(bono_total))
-        r8.metric("Precio final CLP unidad", fmt_clp(precio_final_unidad * dolar_usado))
+        r5.metric("Margen final %", f"{margen_importer_pct_final:.1f}%")
+        r6.metric("Ingreso total negocio", fmt_usd(ingreso_total))
+        r7.metric("Costo total negocio", fmt_usd(costo_total_negocio))
+        r8.metric("Margen total negocio", fmt_usd(margen_total_negocio))
 
-        st.markdown("### Tabla resumen")
+        st.markdown("### Buscar valor objetivo")
+
+        obj1, obj2, obj3 = st.columns(3)
+
+        with obj1:
+            margen_objetivo_pct = st.number_input(
+                "Margen objetivo %",
+                value=15.0,
+                step=0.5,
+                disabled=not puede_editar_costos,
+                key="margen_objetivo_iveco"
+            )
+
+        precio_para_margen_objetivo = (
+            total_costo_usd / (1 - margen_objetivo_pct / 100)
+            if margen_objetivo_pct < 100 else 0
+        )
+
+        with obj2:
+            st.metric(
+                "Precio necesario USD",
+                fmt_usd(precio_para_margen_objetivo)
+            )
+
+        with obj3:
+            st.metric(
+                "Precio necesario CLP",
+                fmt_clp(precio_para_margen_objetivo * dolar_usado)
+            )
+
+        st.markdown("### Resumen comercial")
 
         resumen = pd.DataFrame({
             "Concepto": [
-                "Marca",
+                "Grupo",
                 "Modelo",
-                "Variante",
-                "Cantidad unidades",
-                "Costo unitario USD",
+                "Total costo USD",
+                "Total costo CLP",
+                "% Mg Bruto",
                 "Precio lista USD",
+                "Precio lista CLP",
+                "% Mg Dealer CCS",
                 "Precio venta dealer USD",
-                "Precio venta objetivo USD",
                 "Descuento %",
                 "Descuento USD por %",
                 "Descuento adicional USD",
-                "Bono vendedor USD",
                 "Precio final unidad USD",
                 "Margen unitario USD",
                 "Margen final %",
+                "Cantidad unidades",
                 "Ingreso total USD",
-                "Costo total USD",
+                "Costo total negocio USD",
                 "Margen total negocio USD",
+                "Bono vendedor interno CLP",
                 "Dólar utilizado",
-                "Precio final unidad CLP",
             ],
             "Valor": [
-                "IVECO",
-                row[col_modelo],
-                row[col_variante] if col_variante else "",
-                cantidad,
-                fmt_usd(costo_usd),
+                grupo_sel,
+                modelo_sel,
+                fmt_usd(total_costo_usd),
+                fmt_clp(total_costo_usd * dolar_usado),
+                f"{mg_bruto_pct:.1f}%",
                 fmt_usd(precio_lista_usd),
-                fmt_usd(precio_dealer_usd),
-                fmt_usd(precio_venta_objetivo),
+                fmt_clp(precio_lista_clp),
+                f"{mg_dealer_pct:.1f}%",
+                fmt_usd(precio_venta_dealer),
                 f"{descuento_pct:.1f}%",
                 fmt_usd(descuento_pct_usd),
-                fmt_usd(descuento_usd_manual),
-                fmt_usd(bono_vendedor),
+                fmt_usd(descuento_usd),
                 fmt_usd(precio_final_unidad),
-                fmt_usd(margen_unitario),
-                f"{margen_pct:.1f}%",
+                fmt_usd(margen_importer_unitario),
+                f"{margen_importer_pct_final:.1f}%",
+                cantidad,
                 fmt_usd(ingreso_total),
-                fmt_usd(costo_total),
-                fmt_usd(margen_total),
+                fmt_usd(costo_total_negocio),
+                fmt_usd(margen_total_negocio),
+                fmt_clp(bono_vendedor_clp),
                 fmt_clp(dolar_usado, decimales=2),
-                fmt_clp(precio_final_unidad * dolar_usado),
             ]
         })
 
         st.dataframe(resumen, use_container_width=True, hide_index=True)
 
-        st.markdown("### Objetivos de precio sobre costo")
+        with st.expander("Ver base leída desde Excel"):
+            st.dataframe(df_iveco, use_container_width=True, hide_index=True)
 
-        objetivos = []
-        for pct in [5, 10, 15, 20]:
-            precio_obj = costo_usd * (1 + pct / 100)
-            margen_obj = precio_obj - costo_usd
-            objetivos.append({
-                "Objetivo": f"+{pct}%",
-                "Precio objetivo USD": precio_obj,
-                "Precio objetivo CLP": precio_obj * dolar_usado,
-                "Margen unitario USD": margen_obj,
-                "Margen total negocio USD": margen_obj * cantidad,
-            })
-
-        df_obj = pd.DataFrame(objetivos)
-        df_obj_v = df_obj.copy()
-        df_obj_v["Precio objetivo USD"] = df_obj_v["Precio objetivo USD"].apply(fmt_usd)
-        df_obj_v["Precio objetivo CLP"] = df_obj_v["Precio objetivo CLP"].apply(fmt_clp)
-        df_obj_v["Margen unitario USD"] = df_obj_v["Margen unitario USD"].apply(fmt_usd)
-        df_obj_v["Margen total negocio USD"] = df_obj_v["Margen total negocio USD"].apply(fmt_usd)
-
-        st.dataframe(df_obj_v, use_container_width=True, hide_index=True)
-
-        fig_obj = px.bar(
-            df_obj,
-            x="Objetivo",
-            y="Precio objetivo USD",
-            text="Precio objetivo USD",
-            title="Objetivos de precio sobre costo unitario"
-        )
-        fig_obj.update_traces(texttemplate="%{y:,.0f}", textposition="outside")
-        fig_obj.update_layout(height=380)
-        st.plotly_chart(fig_obj, use_container_width=True)
-
-        with st.expander("Ver base original IVECO"):
-            st.dataframe(df_modelos.drop(columns=["_costo_usd", "selector"]), use_container_width=True, hide_index=True)
+        if not puede_editar_costos:
+            st.info("Este usuario tiene acceso solo de visualización.")
