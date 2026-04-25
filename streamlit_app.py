@@ -1983,4 +1983,4 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         st.dataframe(resumen, use_container_width=True, hide_index=True)
 
         if not es_admin_costos and es_rodrigo:
-            st.info("Rodrigo puede modificar únicamente Margen Importer %, % Mg Dealer CCS y cantidad.")
+            st.info()
