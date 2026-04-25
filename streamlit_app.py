@@ -1517,32 +1517,13 @@ with tab_dash:
         st.error(f"Error dashboard: {e}")
         
 # =========================================================
-# TAB 5 - ESTRUCTURA DE COSTO - CALCULADORA IVECO
+# TAB 5 - CALCULADORA COMERCIAL IVECO
 # =========================================================
 if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
     with tab_cost:
         st.subheader("Calculadora comercial - IVECO")
 
         puede_editar_costos = st.session_state.usuario in {"forellana", "dvejar"}
-
-        ARCHIVO_COSTOS = os.path.join("data", "Estructura de costos.xlsx")
-
-        if not os.path.exists(ARCHIVO_COSTOS):
-            st.error(f"No se encontró el archivo de costos en: {ARCHIVO_COSTOS}")
-            st.stop()
-
-        def to_num(valor):
-            try:
-                if valor is None or str(valor).strip() == "":
-                    return 0.0
-                txt = str(valor).replace("USD", "").replace("$", "").strip()
-                txt = txt.replace(".", "").replace(",", ".")
-                return float(txt)
-            except Exception:
-                try:
-                    return float(valor)
-                except Exception:
-                    return 0.0
 
         def fmt_usd(valor):
             return f"USD {valor:,.0f}".replace(",", ".")
@@ -1554,184 +1535,214 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             txt = f"CLP {valor:,.2f}"
             return txt.replace(",", "X").replace(".", ",").replace("X", ".")
 
-        def normalizar_var(txt):
-            return normalizar_texto(str(txt)).replace("  ", " ").strip()
+        def limpiar_key(txt):
+            return normalizar_texto(str(txt)).replace(" ", "_").replace("/", "_").replace("+", "mas")
 
-        def buscar_valor(row, opciones):
-            for op in opciones:
-                op_n = normalizar_var(op)
-                for k in row.index:
-                    if normalizar_var(k) == op_n:
-                        return row[k]
-            return 0
+        IVECO_MODELOS = {
+            "Stock antiguo IVECO": {
+                "Daily Vetrato (20+1) 2025": {
+                    "variante": "S57E5BG1A", "valor_ex_fabrica": 21800, "adas": 0,
+                    "flete_seguro": 3300, "impuesto_flete": 175, "pdi": 200,
+                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
+                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
+                    "equipamiento": 17000, "mg_bruto_pct": 16.26, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 400000
+                },
+                "Daily Vetrato Semi 2024 sin asiento": {
+                    "variante": "S57E5BG1A", "valor_ex_fabrica": 24200, "adas": 0,
+                    "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200,
+                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
+                    "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0,
+                    "equipamiento": 0, "mg_bruto_pct": 31.63, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 250000
+                },
+                "Daily Escolar 2024 Dikar 32+1": {
+                    "variante": "", "valor_ex_fabrica": 24200, "adas": 0,
+                    "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200,
+                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
+                    "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0,
+                    "equipamiento": 5198, "mg_bruto_pct": 26.53, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 500000
+                },
+                "Daily 18+1 2023": {
+                    "variante": "S57E5BG1A", "valor_ex_fabrica": 37000, "adas": 0,
+                    "flete_seguro": 3300, "impuesto_flete": 175, "pdi": 400,
+                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
+                    "campana_mantencion": 0, "insonorizacion": 1500, "carroceria_origen": 0,
+                    "equipamiento": 0, "mg_bruto_pct": 17.83, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 500000
+                },
+                "Daily 18+1 3P fábrica 2024": {
+                    "variante": "S57E5BG1A", "valor_ex_fabrica": 37000, "adas": 0,
+                    "flete_seguro": 3300, "impuesto_flete": 175, "pdi": 400,
+                    "flete_interno": 400, "customs": 0, "comision_vendedor": 200,
+                    "campana_mantencion": 0, "insonorizacion": 1500, "carroceria_origen": 0,
+                    "equipamiento": 1250, "mg_bruto_pct": -0.53, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 500000
+                },
+                "Daily 18+1 3P": {
+                    "variante": "F33EBAQ1", "valor_ex_fabrica": 25833, "adas": 0,
+                    "flete_seguro": 3300, "impuesto_flete": 150, "pdi": 400,
+                    "flete_interno": 300, "customs": 0, "comision_vendedor": 200,
+                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
+                    "equipamiento": 0, "mg_bruto_pct": 24.73, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 500000
+                },
+                "Daily 18+1 2P fábrica 2025": {
+                    "variante": "", "valor_ex_fabrica": 24200, "adas": 0,
+                    "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200,
+                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
+                    "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0,
+                    "equipamiento": 0, "mg_bruto_pct": 30.85, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 500000
+                },
+                "Daily 18+1 3P (fábrica + Dikar) 2025": {
+                    "variante": "", "valor_ex_fabrica": 24200, "adas": 0,
+                    "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200,
+                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
+                    "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0,
+                    "equipamiento": 7119, "mg_bruto_pct": 17.33, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 500000
+                },
+                "Daily Escolar 2025 Dikar 32+1": {
+                    "variante": "", "valor_ex_fabrica": 24200, "adas": 0,
+                    "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200,
+                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
+                    "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0,
+                    "equipamiento": 5900, "mg_bruto_pct": 26.01, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 500000
+                },
+                "Daily 4x4": {
+                    "variante": "", "valor_ex_fabrica": 44000, "adas": 0,
+                    "flete_seguro": 3709, "impuesto_flete": 106, "pdi": 222,
+                    "flete_interno": 250, "customs": 0, "comision_vendedor": 178,
+                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
+                    "equipamiento": 0, "mg_bruto_pct": 17.50, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 500000
+                },
+            },
+            "Nuevos pedidos EURO VI IVECO": {
+                "Daily Vetrato 50-180 (20+1) VIP Dikar 2026 PD": {
+                    "variante": "", "valor_ex_fabrica": 32630, "adas": 0,
+                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
+                    "flete_interno": 0, "customs": 0, "comision_vendedor": 581,
+                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
+                    "equipamiento": 17503, "mg_bruto_pct": 24.00, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 400000
+                },
+                "Daily Vetrato 50-180 (20+1) Basic Dikar 2026": {
+                    "variante": "", "valor_ex_fabrica": 33940, "adas": 0,
+                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
+                    "flete_interno": 0, "customs": 0, "comision_vendedor": 571,
+                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
+                    "equipamiento": 15243, "mg_bruto_pct": 24.00, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 400000
+                },
+                "Daily Vetrato Escolar Dikar 50-180 30+2+1 2026": {
+                    "variante": "", "valor_ex_fabrica": 33940, "adas": 0,
+                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
+                    "flete_interno": 0, "customs": 0, "comision_vendedor": 476,
+                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
+                    "equipamiento": 6328, "mg_bruto_pct": 24.05, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 400000
+                },
+                "Daily 19+1 Dikar PD 2026": {
+                    "variante": "", "valor_ex_fabrica": 32630, "adas": 0,
+                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
+                    "flete_interno": 0, "customs": 0, "comision_vendedor": 475,
+                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
+                    "equipamiento": 7571, "mg_bruto_pct": 24.00, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 400000
+                },
+                "Daily 19+1+1 PD Dikar 2026": {
+                    "variante": "", "valor_ex_fabrica": 32630, "adas": 0,
+                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
+                    "flete_interno": 0, "customs": 0, "comision_vendedor": 479,
+                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
+                    "equipamiento": 7944, "mg_bruto_pct": 24.01, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 400000
+                },
+                "Daily SOF 11+1 PD 2026": {
+                    "variante": "", "valor_ex_fabrica": 32630, "adas": 0,
+                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
+                    "flete_interno": 0, "customs": 0, "comision_vendedor": 535,
+                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
+                    "equipamiento": 13220, "mg_bruto_pct": 24.00, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 400000
+                },
+                "Daily 16m3 2026": {
+                    "variante": "F6G99BB1000015", "valor_ex_fabrica": 34900, "adas": 0,
+                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
+                    "flete_interno": 0, "customs": 0, "comision_vendedor": 419,
+                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
+                    "equipamiento": 0, "mg_bruto_pct": 24.07, "mg_dealer_pct": 8.0,
+                    "bono_vendedor_clp": 400000
+                },
+            }
+        }
 
-        @st.cache_data(show_spinner=False)
-        def cargar_iveco(archivo):
-            df = pd.read_excel(archivo, sheet_name="IVECO", header=None).fillna("")
-
-            fila_modelo = None
-            for i in range(len(df)):
-                if normalizar_var(df.iat[i, 0]) == "modelo":
-                    fila_modelo = i
-                    break
-
-            if fila_modelo is None:
-                return pd.DataFrame()
-
-            fila_grupo = max(fila_modelo - 1, 0)
-            grupos_raw = df.iloc[fila_grupo].replace("", pd.NA).ffill().fillna("").tolist()
-
-            registros = []
-
-            for col in range(1, df.shape[1]):
-                modelo = str(df.iat[fila_modelo, col]).strip()
-                if modelo == "":
-                    continue
-
-                grupo = str(grupos_raw[col]).strip()
-                if grupo == "":
-                    grupo = "Sin clasificación"
-
-                data = {
-                    "Clasificación": grupo,
-                    "Modelo": modelo,
-                    "Columna Excel": col,
-                }
-
-                for fila in range(fila_modelo + 1, df.shape[0]):
-                    variable = str(df.iat[fila, 0]).strip()
-                    if variable != "":
-                        data[variable] = df.iat[fila, col]
-
-                registros.append(data)
-
-            return pd.DataFrame(registros)
-
-        df_iveco = cargar_iveco(ARCHIVO_COSTOS)
-
-        if df_iveco.empty:
-            st.warning("No se encontraron modelos válidos en la hoja IVECO.")
-            st.stop()
-
-        orden_grupos = [
-            "STOCK ANTIGUO IVECO",
-            "Nuevos Pedidos EURO VI IVECO",
-            "Stock antiguo IVECO",
-            "Sin clasificación",
-        ]
-
-        grupos_disponibles = df_iveco["Clasificación"].dropna().unique().tolist()
-        grupos_ordenados = [g for g in orden_grupos if g in grupos_disponibles]
-        grupos_ordenados += [g for g in grupos_disponibles if g not in grupos_ordenados]
-
-        c0, c1 = st.columns([1, 2])
+        c0, c1, c2 = st.columns([1.2, 2.2, 1])
 
         with c0:
-            grupo_sel = st.selectbox(
+            clasificacion = st.selectbox(
                 "Clasificación",
-                grupos_ordenados,
-                key="grupo_iveco_calc"
+                list(IVECO_MODELOS.keys()),
+                key="iveco_clasificacion"
             )
 
-        df_filtrado = df_iveco[df_iveco["Clasificación"] == grupo_sel].copy()
+        modelos_disponibles = list(IVECO_MODELOS[clasificacion].keys())
 
         with c1:
-            modelo_sel = st.selectbox(
+            modelo = st.selectbox(
                 "Modelo",
-                df_filtrado["Modelo"].tolist(),
-                key="modelo_iveco_calc"
+                modelos_disponibles,
+                key="iveco_modelo"
             )
 
-        row = df_filtrado[df_filtrado["Modelo"] == modelo_sel].iloc[0]
-        modelo_key = normalizar_texto(f"{grupo_sel}_{modelo_sel}").replace(" ", "_")
+        base = IVECO_MODELOS[clasificacion][modelo]
+        modelo_key = limpiar_key(f"{clasificacion}_{modelo}")
+
+        with c2:
+            if st.button("Restablecer valores"):
+                for k in list(st.session_state.keys()):
+                    if modelo_key in k:
+                        del st.session_state[k]
+                st.rerun()
 
         try:
-            dolar_bcch, mensaje_dolar = obtener_dolar_observado_bcch()
-            dolar_base = float(dolar_bcch) if dolar_bcch else 885.0
+            dolar_bcch, _ = obtener_dolar_observado_bcch()
+            dolar_default = float(dolar_bcch) if dolar_bcch else 885.0
         except Exception:
-            dolar_base = 885.0
+            dolar_default = 885.0
 
         st.markdown("### Datos base del modelo")
 
-        col1, col2, col3, col4 = st.columns(4)
+        b1, b2, b3, b4 = st.columns(4)
 
-        with col1:
-            valor_fabrica = st.number_input(
-                "Valor ex fábrica USD",
-                value=to_num(buscar_valor(row, ["Valor ex fabrica", "Valor ex fábrica"])),
-                step=500.0,
-                disabled=not puede_editar_costos,
-                key=f"valor_fabrica_iveco_{modelo_key}"
-            )
+        with b1:
+            valor_ex_fabrica = st.number_input("Valor ex fábrica USD", value=float(base["valor_ex_fabrica"]), step=500.0, disabled=not puede_editar_costos, key=f"valor_ex_fabrica_{modelo_key}")
+            adas = st.number_input("ADAS USD", value=float(base["adas"]), step=100.0, disabled=not puede_editar_costos, key=f"adas_{modelo_key}")
+            flete_seguro = st.number_input("Flete + seguro USD", value=float(base["flete_seguro"]), step=100.0, disabled=not puede_editar_costos, key=f"flete_seguro_{modelo_key}")
 
-            flete_seguro = st.number_input(
-                "Flete + seguro USD",
-                value=to_num(buscar_valor(row, ["Flete + seguro"])),
-                step=100.0,
-                disabled=not puede_editar_costos,
-                key=f"flete_seguro_iveco_{modelo_key}"
-            )
+        with b2:
+            impuesto_flete = st.number_input("Impuesto flete puerto USD", value=float(base["impuesto_flete"]), step=50.0, disabled=not puede_editar_costos, key=f"impuesto_flete_{modelo_key}")
+            pdi = st.number_input("PDI USD", value=float(base["pdi"]), step=50.0, disabled=not puede_editar_costos, key=f"pdi_{modelo_key}")
+            flete_interno = st.number_input("Flete interno USD", value=float(base["flete_interno"]), step=50.0, disabled=not puede_editar_costos, key=f"flete_interno_{modelo_key}")
 
-        with col2:
-            impuesto_flete = st.number_input(
-                "Impuesto flete puerto USD",
-                value=to_num(buscar_valor(row, ["Impuesto Flete puerto", "Impuesto flete puerto"])),
-                step=50.0,
-                disabled=not puede_editar_costos,
-                key=f"impuesto_flete_iveco_{modelo_key}"
-            )
+        with b3:
+            customs = st.number_input("Customs USD", value=float(base["customs"]), step=50.0, disabled=not puede_editar_costos, key=f"customs_{modelo_key}")
+            comision_vendedor = st.number_input("Comisión vendedor USD", value=float(base["comision_vendedor"]), step=50.0, disabled=not puede_editar_costos, key=f"comision_vendedor_{modelo_key}")
+            campana_mantencion = st.number_input("Campaña mantención USD", value=float(base["campana_mantencion"]), step=100.0, disabled=not puede_editar_costos, key=f"campana_mantencion_{modelo_key}")
 
-            pdi = st.number_input(
-                "PDI USD",
-                value=to_num(buscar_valor(row, ["PDI"])),
-                step=50.0,
-                disabled=not puede_editar_costos,
-                key=f"pdi_iveco_{modelo_key}"
-            )
-
-        with col3:
-            flete_interno = st.number_input(
-                "Flete interno USD",
-                value=to_num(buscar_valor(row, ["Flete interno"])),
-                step=50.0,
-                disabled=not puede_editar_costos,
-                key=f"flete_interno_iveco_{modelo_key}"
-            )
-
-            comision_vendedor = st.number_input(
-                "Comisión vendedor USD",
-                value=to_num(buscar_valor(row, ["Comisión vendedor", "Comision vendedor"])),
-                step=50.0,
-                disabled=not puede_editar_costos,
-                key=f"comision_vendedor_iveco_{modelo_key}"
-            )
-
-        with col4:
-            insonorizacion = st.number_input(
-                "Insonorización y refuerzos USD",
-                value=to_num(buscar_valor(row, ["Inzonorización y refuerzos", "Insonorización y refuerzos"])),
-                step=100.0,
-                disabled=not puede_editar_costos,
-                key=f"insonorizacion_iveco_{modelo_key}"
-            )
-
-            equipamiento = st.number_input(
-                "EE.EE / asientos / equipamiento USD",
-                value=to_num(buscar_valor(row, ["EE.EE (asientos y equipamiento )", "EE.EE (asientos y equipamiento)"])),
-                step=100.0,
-                disabled=not puede_editar_costos,
-                key=f"equipamiento_iveco_{modelo_key}"
-            )
+        with b4:
+            insonorizacion = st.number_input("Insonorización y refuerzos USD", value=float(base["insonorizacion"]), step=100.0, disabled=not puede_editar_costos, key=f"insonorizacion_{modelo_key}")
+            carroceria_origen = st.number_input("Carrocería de origen USD", value=float(base["carroceria_origen"]), step=100.0, disabled=not puede_editar_costos, key=f"carroceria_origen_{modelo_key}")
+            equipamiento = st.number_input("EE.EE / asientos / equipamiento USD", value=float(base["equipamiento"]), step=100.0, disabled=not puede_editar_costos, key=f"equipamiento_{modelo_key}")
 
         total_costo_usd = (
-            valor_fabrica
-            + flete_seguro
-            + impuesto_flete
-            + pdi
-            + flete_interno
-            + comision_vendedor
-            + insonorizacion
-            + equipamiento
+            valor_ex_fabrica + adas + flete_seguro + impuesto_flete + pdi +
+            flete_interno + customs + comision_vendedor + campana_mantencion +
+            insonorizacion + carroceria_origen + equipamiento
         )
 
         st.markdown("### Parámetros comerciales")
@@ -1739,109 +1750,49 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         p1, p2, p3, p4 = st.columns(4)
 
         with p1:
-            dolar_usado = st.number_input(
-                "Dólar utilizado",
-                value=dolar_base,
-                step=1.0,
-                disabled=not puede_editar_costos,
-                key=f"dolar_iveco_{modelo_key}"
-            )
+            dolar_usado = st.number_input("Dólar observado", value=dolar_default, step=1.0, disabled=not puede_editar_costos, key=f"dolar_{modelo_key}")
 
         with p2:
-            mg_bruto_base = to_num(buscar_valor(row, ["% Mg Bruto"]))
-            if mg_bruto_base <= 1:
-                mg_bruto_base = mg_bruto_base * 100
-
-            mg_bruto_pct = st.number_input(
-                "% Mg Bruto",
-                value=float(mg_bruto_base),
-                step=0.5,
-                disabled=not puede_editar_costos,
-                key=f"mg_bruto_iveco_{modelo_key}"
-            )
+            mg_bruto_pct = st.number_input("% Mg Bruto", value=float(base["mg_bruto_pct"]), step=0.5, disabled=not puede_editar_costos, key=f"mg_bruto_{modelo_key}")
 
         with p3:
-            mg_dealer_base = to_num(buscar_valor(row, ["% Mg Dealer CCS"]))
-            if mg_dealer_base <= 1:
-                mg_dealer_base = mg_dealer_base * 100
-
-            mg_dealer_pct = st.number_input(
-                "% Mg Dealer CCS",
-                value=float(mg_dealer_base),
-                step=0.5,
-                disabled=not puede_editar_costos,
-                key=f"mg_dealer_iveco_{modelo_key}"
-            )
+            mg_dealer_pct = st.number_input("% Mg Dealer CCS", value=float(base["mg_dealer_pct"]), step=0.5, disabled=not puede_editar_costos, key=f"mg_dealer_{modelo_key}")
 
         with p4:
-            bono_vendedor_clp = st.number_input(
-                "Bono vendedor interno CLP",
-                value=to_num(buscar_valor(row, ["Bono vendedor intertno", "Bono vendedor interno"])),
-                step=50000.0,
-                disabled=not puede_editar_costos,
-                key=f"bono_vendedor_iveco_{modelo_key}"
-            )
+            bono_vendedor_clp = st.number_input("Bono vendedor interno CLP", value=float(base["bono_vendedor_clp"]), step=50000.0, disabled=not puede_editar_costos, key=f"bono_vendedor_{modelo_key}")
 
         precio_lista_usd = total_costo_usd / (1 - mg_bruto_pct / 100) if mg_bruto_pct < 100 else 0
         precio_lista_clp = precio_lista_usd * dolar_usado
         precio_venta_dealer_base = precio_lista_usd * (1 - mg_dealer_pct / 100)
 
-        st.markdown("### Simulación de precio y descuentos")
+        st.markdown("### Simulación de precio y descuento")
 
         s1, s2, s3, s4 = st.columns(4)
 
         with s1:
-            precio_venta_dealer = st.number_input(
-                "Precio venta dealer USD",
-                value=float(precio_venta_dealer_base),
-                step=500.0,
-                disabled=not puede_editar_costos,
-                key=f"precio_dealer_iveco_{modelo_key}"
-            )
+            precio_venta_dealer = st.number_input("Precio venta dealer USD", value=float(precio_venta_dealer_base), step=500.0, disabled=not puede_editar_costos, key=f"precio_dealer_{modelo_key}")
 
         with s2:
-            descuento_pct = st.number_input(
-                "Descuento %",
-                value=0.0,
-                min_value=0.0,
-                max_value=100.0,
-                step=0.5,
-                disabled=not puede_editar_costos,
-                key=f"descuento_pct_iveco_{modelo_key}"
-            )
+            descuento_pct = st.number_input("Descuento %", value=0.0, min_value=0.0, max_value=100.0, step=0.5, disabled=not puede_editar_costos, key=f"descuento_pct_{modelo_key}")
 
         with s3:
-            descuento_usd = st.number_input(
-                "Descuento adicional USD",
-                value=0.0,
-                min_value=0.0,
-                step=500.0,
-                disabled=not puede_editar_costos,
-                key=f"descuento_usd_iveco_{modelo_key}"
-            )
+            descuento_usd = st.number_input("Descuento adicional USD", value=0.0, min_value=0.0, step=500.0, disabled=not puede_editar_costos, key=f"descuento_usd_{modelo_key}")
 
         with s4:
-            cantidad = st.number_input(
-                "Cantidad unidades",
-                value=1,
-                min_value=1,
-                step=1,
-                disabled=not puede_editar_costos,
-                key=f"cantidad_iveco_{modelo_key}"
-            )
+            cantidad = st.number_input("Cantidad unidades", value=1, min_value=1, step=1, disabled=not puede_editar_costos, key=f"cantidad_{modelo_key}")
 
         descuento_pct_usd = precio_venta_dealer * (descuento_pct / 100)
         precio_final_unidad = precio_venta_dealer - descuento_pct_usd - descuento_usd
+        margen_unitario = precio_final_unidad - total_costo_usd
+        margen_pct = (margen_unitario / precio_final_unidad * 100) if precio_final_unidad > 0 else 0
 
-        margen_importer_unitario = precio_final_unidad - total_costo_usd
-        margen_importer_pct_final = (
-            margen_importer_unitario / precio_final_unidad * 100
-            if precio_final_unidad > 0 else 0
-        )
+        bono_vendedor_usd = bono_vendedor_clp / dolar_usado if dolar_usado > 0 else 0
+        margen_neto_unitario = margen_unitario - bono_vendedor_usd
 
         ingreso_total = precio_final_unidad * cantidad
-        costo_total_negocio = total_costo_usd * cantidad
-        margen_total_negocio = margen_importer_unitario * cantidad
+        costo_total = total_costo_usd * cantidad
+        margen_total = margen_unitario * cantidad
+        margen_neto_total = margen_neto_unitario * cantidad
 
         st.markdown("### Resultado ejecutivo")
 
@@ -1849,88 +1800,54 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         r1.metric("Total costo unitario", fmt_usd(total_costo_usd))
         r2.metric("Precio lista USD", fmt_usd(precio_lista_usd))
         r3.metric("Precio final unidad", fmt_usd(precio_final_unidad))
-        r4.metric("Margen unitario", fmt_usd(margen_importer_unitario))
+        r4.metric("Margen unitario", fmt_usd(margen_unitario))
 
         r5, r6, r7, r8 = st.columns(4)
-        r5.metric("Margen final %", f"{margen_importer_pct_final:.1f}%")
-        r6.metric("Ingreso total negocio", fmt_usd(ingreso_total))
-        r7.metric("Costo total negocio", fmt_usd(costo_total_negocio))
-        r8.metric("Margen total negocio", fmt_usd(margen_total_negocio))
+        r5.metric("Margen final %", f"{margen_pct:.1f}%")
+        r6.metric("Margen total negocio", fmt_usd(margen_total))
+        r7.metric("Margen neto unitario", fmt_usd(margen_neto_unitario))
+        r8.metric("Margen neto negocio", fmt_usd(margen_neto_total))
 
         st.markdown("### Buscar precio objetivo")
 
-        obj1, obj2, obj3 = st.columns(3)
+        o1, o2, o3 = st.columns(3)
 
-        with obj1:
-            margen_objetivo_pct = st.number_input(
-                "Margen objetivo %",
-                value=15.0,
-                min_value=0.0,
-                max_value=99.0,
-                step=0.5,
-                disabled=not puede_editar_costos,
-                key=f"margen_objetivo_iveco_{modelo_key}"
-            )
+        with o1:
+            margen_objetivo_pct = st.number_input("Margen objetivo %", value=15.0, min_value=0.0, max_value=99.0, step=0.5, disabled=not puede_editar_costos, key=f"margen_objetivo_{modelo_key}")
 
-        precio_objetivo_usd = (
-            total_costo_usd / (1 - margen_objetivo_pct / 100)
-            if margen_objetivo_pct < 100 else 0
-        )
+        precio_objetivo_usd = total_costo_usd / (1 - margen_objetivo_pct / 100) if margen_objetivo_pct < 100 else 0
 
-        with obj2:
+        with o2:
             st.metric("Precio necesario USD", fmt_usd(precio_objetivo_usd))
 
-        with obj3:
+        with o3:
             st.metric("Precio necesario CLP", fmt_clp(precio_objetivo_usd * dolar_usado))
 
         st.markdown("### Resumen comercial")
 
         resumen = pd.DataFrame({
             "Concepto": [
-                "Clasificación",
-                "Modelo",
-                "Total costo USD",
-                "Total costo CLP",
-                "% Mg Bruto",
-                "Precio lista USD",
-                "Precio lista CLP",
-                "% Mg Dealer CCS",
-                "Precio venta dealer USD",
-                "Descuento %",
-                "Descuento USD por %",
-                "Descuento adicional USD",
-                "Precio final unidad USD",
-                "Margen unitario USD",
-                "Margen final %",
-                "Cantidad unidades",
-                "Ingreso total USD",
-                "Costo total negocio USD",
-                "Margen total negocio USD",
-                "Bono vendedor interno CLP",
-                "Dólar utilizado",
+                "Clasificación", "Modelo", "Variante", "Total costo USD",
+                "Total costo CLP", "% Mg Bruto", "Precio lista USD",
+                "Precio lista CLP", "% Mg Dealer CCS", "Precio venta dealer USD",
+                "Descuento %", "Descuento USD por %", "Descuento adicional USD",
+                "Precio final unidad USD", "Margen unitario USD", "Margen final %",
+                "Bono vendedor CLP", "Bono vendedor USD", "Margen neto unitario USD",
+                "Cantidad unidades", "Ingreso total USD", "Costo total USD",
+                "Margen total USD", "Margen neto total USD", "Dólar utilizado"
             ],
             "Valor": [
-                grupo_sel,
-                modelo_sel,
-                fmt_usd(total_costo_usd),
-                fmt_clp(total_costo_usd * dolar_usado),
-                f"{mg_bruto_pct:.1f}%",
-                fmt_usd(precio_lista_usd),
-                fmt_clp(precio_lista_clp),
-                f"{mg_dealer_pct:.1f}%",
-                fmt_usd(precio_venta_dealer),
-                f"{descuento_pct:.1f}%",
-                fmt_usd(descuento_pct_usd),
-                fmt_usd(descuento_usd),
-                fmt_usd(precio_final_unidad),
-                fmt_usd(margen_importer_unitario),
-                f"{margen_importer_pct_final:.1f}%",
-                cantidad,
-                fmt_usd(ingreso_total),
-                fmt_usd(costo_total_negocio),
-                fmt_usd(margen_total_negocio),
-                fmt_clp(bono_vendedor_clp),
-                fmt_clp_dec(dolar_usado),
+                clasificacion, modelo, base["variante"], fmt_usd(total_costo_usd),
+                fmt_clp(total_costo_usd * dolar_usado), f"{mg_bruto_pct:.1f}%",
+                fmt_usd(precio_lista_usd), fmt_clp(precio_lista_clp),
+                f"{mg_dealer_pct:.1f}%", fmt_usd(precio_venta_dealer),
+                f"{descuento_pct:.1f}%", fmt_usd(descuento_pct_usd),
+                fmt_usd(descuento_usd), fmt_usd(precio_final_unidad),
+                fmt_usd(margen_unitario), f"{margen_pct:.1f}%",
+                fmt_clp(bono_vendedor_clp), fmt_usd(bono_vendedor_usd),
+                fmt_usd(margen_neto_unitario), cantidad, fmt_usd(ingreso_total),
+                fmt_usd(costo_total), fmt_usd(margen_total),
+                fmt_usd(margen_neto_total), fmt_clp_dec(dolar_usado)
             ]
         })
 
@@ -1938,6 +1855,3 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
 
         if not puede_editar_costos:
             st.info("Este usuario tiene acceso solo de visualización.")
-
-        with st.expander("Ver base IVECO leída desde Excel"):
-            st.dataframe(df_iveco, use_container_width=True, hide_index=True)
