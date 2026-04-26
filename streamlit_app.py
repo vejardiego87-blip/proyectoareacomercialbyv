@@ -1822,7 +1822,7 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         st.markdown("""
         <div class="box-margen">
             <div class="titulo-box">3. Margen Importer y Dealer</div>
-            <div class="sub-box">Zona naranjo: variables principales de simulación. Rodrigo puede modificar Margen Importer % y % Mg Dealer CCS; Diego y Fabián pueden modificar todo.</div>
+            <div class="sub-box">Zona naranjo: búsqueda del margen objetivo. Al variar Margen Importer % objetivo y % Mg Dealer CCS, se calculan automáticamente Precio Venta Dealer y Precio Lista.</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1832,7 +1832,7 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
 
         with p1:
             margen_importer_pct_obj = st.number_input(
-                "Margen Importer %",
+                "Margen Importer % objetivo",
                 value=float(base["margen_importer_pct"]),
                 step=0.5,
                 disabled=precio_disabled,
@@ -1840,12 +1840,12 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             )
 
         with p2:
-            mg_dealer_pct = st.number_input(
-                "% Mg Dealer CCS",
-                value=float(base["mg_dealer_pct"]),
-                step=0.5,
+            precio_lista_usd_manual = st.number_input(
+                "Precio Lista USD",
+                value=float(base.get("precio_lista_usd", total_costo_usd * 1.25)),
+                step=500.0,
                 disabled=precio_disabled,
-                key=f"mg_dealer_{modelo_key}"
+                key=f"precio_lista_manual_{modelo_key}"
             )
 
         with p3:
@@ -1880,12 +1880,10 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             precio_venta_dealer / (1 - mg_dealer_pct / 100)
             if mg_dealer_pct < 100 else 0
         )
-
-        margen_importer_usd = precio_venta_dealer - total_costo_usd
-
-        margen_importer_pct_real = (
-            margen_importer_usd / precio_venta_dealer * 100
-            if precio_venta_dealer > 0 else 0
+        precio_lista_usd = precio_lista_usd_manual
+        mg_dealer_pct = (
+            (1 - (precio_venta_dealer / precio_lista_usd)) * 100
+            if precio_lista_usd > 0 else 0
         )
 
         bono_vendedor_usd = bono_vendedor_clp / dolar_usado if dolar_usado > 0 else 0
@@ -1981,6 +1979,3 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         })
 
         st.dataframe(resumen, use_container_width=True, hide_index=True)
-
-        if not es_admin_costos and es_rodrigo:
-            st.info("Rodrigo puede modificar únicamente Margen Importer %, % Mg Dealer CCS y cantidad.")
