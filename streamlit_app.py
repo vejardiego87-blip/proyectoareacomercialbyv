@@ -1817,12 +1817,12 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         cc2.metric("Total costo CLP", fmt_clp(total_costo_usd * dolar_usado))
 
         # =========================================================
-        # 3. MARGEN IMPORTER Y DEALER
+        # 3. MARGEN IMPORTER Y PRECIO LISTA
         # =========================================================
         st.markdown("""
         <div class="box-margen">
-            <div class="titulo-box">3. Margen Importer y Dealer</div>
-            <div class="sub-box">Zona naranjo: búsqueda del margen objetivo. Al variar Margen Importer % objetivo y % Mg Dealer CCS, se calculan automáticamente Precio Venta Dealer y Precio Lista.</div>
+            <div class="titulo-box">3. Margen Importer y precio lista</div>
+            <div class="sub-box">Zona naranjo: al variar el Margen Importer % objetivo y el Precio Lista USD, se calcula automáticamente el Precio Venta Dealer y el % Mg Dealer CCS requerido.</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1840,7 +1840,7 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             )
 
         with p2:
-            precio_lista_usd_manual = st.number_input(
+            precio_lista_usd = st.number_input(
                 "Precio Lista USD",
                 value=float(base.get("precio_lista_usd", total_costo_usd * 1.25)),
                 step=500.0,
@@ -1867,23 +1867,25 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
                 key=f"bono_vendedor_{modelo_key}"
             )
 
-        # Fórmulas correctas:
-        # 1) Margen Importer % define Precio Venta Dealer.
-        # 2) % Dealer define Precio Lista.
-        # 3) Margen Importer USD es resultado de Precio Dealer - Costo.
+        # Fórmulas corregidas:
+        # 1) Margen Importer % objetivo define el Precio Venta Dealer.
+        # 2) Precio Lista USD se mantiene como referencia comercial.
+        # 3) % Mg Dealer CCS se calcula automáticamente.
         precio_venta_dealer = (
             total_costo_usd / (1 - margen_importer_pct_obj / 100)
             if margen_importer_pct_obj < 100 else 0
         )
 
-        precio_lista_usd = (
-            precio_venta_dealer / (1 - mg_dealer_pct / 100)
-            if mg_dealer_pct < 100 else 0
-        )
-        precio_lista_usd = precio_lista_usd_manual
         mg_dealer_pct = (
             (1 - (precio_venta_dealer / precio_lista_usd)) * 100
             if precio_lista_usd > 0 else 0
+        )
+
+        margen_importer_usd = precio_venta_dealer - total_costo_usd
+
+        margen_importer_pct_real = (
+            margen_importer_usd / precio_venta_dealer * 100
+            if precio_venta_dealer > 0 else 0
         )
 
         bono_vendedor_usd = bono_vendedor_clp / dolar_usado if dolar_usado > 0 else 0
@@ -1894,13 +1896,18 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         margen_total = margen_importer_usd * cantidad
         margen_neto_total = margen_neto_unitario * cantidad
 
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Precio Venta Dealer USD calculado", fmt_usd(precio_venta_dealer))
+        m2.metric("% Mg Dealer CCS requerido", f"{mg_dealer_pct:.1f}%")
+        m3.metric("Margen Importer USD", fmt_usd(margen_importer_usd))
+
         # =========================================================
         # 4. PRECIOS CALCULADOS
         # =========================================================
         st.markdown("""
         <div class="box-precio">
             <div class="titulo-box">4. Precio calculado</div>
-            <div class="sub-box">Zona amarilla: precios calculados automáticamente desde Margen Importer % y % Dealer.</div>
+            <div class="sub-box">Zona amarilla: precios calculados automáticamente desde Margen Importer % objetivo y Precio Lista USD.</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1908,14 +1915,6 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         y1.metric("Precio Lista USD", fmt_usd(precio_lista_usd))
         y2.metric("Precio Lista CLP", fmt_clp(precio_lista_usd * dolar_usado))
         y3.metric("Precio Venta Dealer USD", fmt_usd(precio_venta_dealer))
-
-        if margen_importer_usd < 0:
-            st.markdown("""
-            <div class="box-alerta">
-                <div class="titulo-box">⚠️ Margen negativo</div>
-                <div class="sub-box">La configuración actual genera pérdida comercial. Revise Margen Importer %, % Dealer o costos base.</div>
-            </div>
-            """, unsafe_allow_html=True)
 
         # =========================================================
         # 5. RESULTADO
