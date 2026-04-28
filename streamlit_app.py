@@ -1778,7 +1778,7 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         st.markdown("""
         <div class="box-costo">
             <div class="titulo-box">2. Estructura de costo</div>
-            <div class="sub-box">Zona celeste: costos base del modelo. Diego y Fabián pueden modificar estos valores; Rodrigo solo visualiza.</div>
+            <div class="sub-box">Zona celeste: costos base del modelo.</div>
         </div>
         """, unsafe_allow_html=True)
 
