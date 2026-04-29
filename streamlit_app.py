@@ -1517,61 +1517,25 @@ with tab_dash:
         st.error(f"Error dashboard: {e}")
         
 # =========================================================
-# TAB 5 - CALCULADORA COMERCIAL IVECO
+# TAB 5 - CALCULADORA COMERCIAL MULTIMARCA
 # =========================================================
 if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
     with tab_cost:
-        st.subheader("Calculadora comercial - IVECO")
+        st.subheader("Calculadora comercial - Estructura de costo")
 
         es_admin_costos = st.session_state.usuario in {"forellana", "dvejar"}
         es_rodrigo = st.session_state.usuario == "rsepulveda"
+        puede_simular = es_admin_costos or es_rodrigo
 
         st.markdown("""
         <style>
-            .box-costo {
-                background-color: #d9edf3;
-                border-left: 6px solid #7fb8c7;
-                padding: 14px;
-                border-radius: 8px;
-                margin-bottom: 12px;
-            }
-            .box-precio {
-                background-color: #fff200;
-                border-left: 6px solid #c7b900;
-                padding: 14px;
-                border-radius: 8px;
-                margin-bottom: 12px;
-            }
-            .box-margen {
-                background-color: #f4b183;
-                border-left: 6px solid #d9822b;
-                padding: 14px;
-                border-radius: 8px;
-                margin-bottom: 12px;
-            }
-            .box-resultado {
-                background-color: #92d050;
-                border-left: 6px solid #4f9d24;
-                padding: 14px;
-                border-radius: 8px;
-                margin-bottom: 12px;
-            }
-            .box-alerta {
-                background-color: #f8d7da;
-                border-left: 6px solid #c00000;
-                padding: 14px;
-                border-radius: 8px;
-                margin-bottom: 12px;
-            }
-            .titulo-box {
-                font-weight: 700;
-                font-size: 18px;
-                margin-bottom: 4px;
-            }
-            .sub-box {
-                font-size: 13px;
-                color: #333333;
-            }
+            .box-costo {background-color:#d9edf3;border-left:6px solid #7fb8c7;padding:14px;border-radius:8px;margin-bottom:12px;}
+            .box-precio {background-color:#fff200;border-left:6px solid #c7b900;padding:14px;border-radius:8px;margin-bottom:12px;}
+            .box-margen {background-color:#f4b183;border-left:6px solid #d9822b;padding:14px;border-radius:8px;margin-bottom:12px;}
+            .box-resultado {background-color:#92d050;border-left:6px solid #4f9d24;padding:14px;border-radius:8px;margin-bottom:12px;}
+            .box-alerta {background-color:#f8d7da;border-left:6px solid #c00000;padding:14px;border-radius:8px;margin-bottom:12px;}
+            .titulo-box {font-weight:700;font-size:18px;margin-bottom:4px;}
+            .sub-box {font-size:13px;color:#333333;}
         </style>
         """, unsafe_allow_html=True)
 
@@ -1586,395 +1550,356 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             return txt.replace(",", "X").replace(".", ",").replace("X", ".")
 
         def limpiar_key(txt):
-            return normalizar_texto(str(txt)).replace(" ", "_").replace("/", "_").replace("+", "mas")
+            return normalizar_texto(str(txt)).replace(" ", "_").replace("/", "_").replace("+", "mas").replace("(", "").replace(")", "")
+
+        def get_dolar_bcch():
+            try:
+                dolar_bcch, _ = obtener_dolar_observado_bcch()
+                return float(dolar_bcch) if dolar_bcch else 885.0
+            except Exception:
+                return 885.0
 
         # =========================================================
         # BASE PREDETERMINADA IVECO
         # =========================================================
         IVECO_MODELOS = {
             "Stock antiguo IVECO": {
-                "Daily Vetrato (20+1) 2025": {
-                    "variante": "S57E5BG1A", "valor_ex_fabrica": 21800, "adas": 0,
-                    "flete_seguro": 3300, "impuesto_flete": 175, "pdi": 200,
-                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
-                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
-                    "equipamiento": 17000, "margen_importer_pct": 9.0, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 400000
-                },
-                "Daily Vetrato Semi 2024 sin asiento": {
-                    "variante": "S57E5BG1A", "valor_ex_fabrica": 24200, "adas": 0,
-                    "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200,
-                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
-                    "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0,
-                    "equipamiento": 0, "margen_importer_pct": 25.7, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 250000
-                },
-                "Daily Escolar 2024 Dikar 32+1": {
-                    "variante": "", "valor_ex_fabrica": 24200, "adas": 0,
-                    "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200,
-                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
-                    "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0,
-                    "equipamiento": 5198, "margen_importer_pct": 20.1, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 500000
-                },
-                "Daily 18+1 2023": {
-                    "variante": "S57E5BG1A", "valor_ex_fabrica": 37000, "adas": 0,
-                    "flete_seguro": 3300, "impuesto_flete": 175, "pdi": 400,
-                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
-                    "campana_mantencion": 0, "insonorizacion": 1500, "carroceria_origen": 0,
-                    "equipamiento": 0, "margen_importer_pct": 10.7, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 500000
-                },
-                "Daily 18+1 3P fábrica 2024": {
-                    "variante": "S57E5BG1A", "valor_ex_fabrica": 37000, "adas": 0,
-                    "flete_seguro": 3300, "impuesto_flete": 175, "pdi": 400,
-                    "flete_interno": 400, "customs": 0, "comision_vendedor": 200,
-                    "campana_mantencion": 0, "insonorizacion": 1500, "carroceria_origen": 0,
-                    "equipamiento": 1250, "margen_importer_pct": -9.3, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 500000
-                },
-                "Daily 18+1 3P": {
-                    "variante": "F33EBAQ1", "valor_ex_fabrica": 25833, "adas": 0,
-                    "flete_seguro": 3300, "impuesto_flete": 150, "pdi": 400,
-                    "flete_interno": 300, "customs": 0, "comision_vendedor": 200,
-                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
-                    "equipamiento": 0, "margen_importer_pct": 18.2, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 500000
-                },
-                "Daily 18+1 2P fábrica 2025": {
-                    "variante": "", "valor_ex_fabrica": 24200, "adas": 0,
-                    "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200,
-                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
-                    "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0,
-                    "equipamiento": 0, "margen_importer_pct": 24.8, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 500000
-                },
-                "Daily 18+1 3P (fábrica + Dikar) 2025": {
-                    "variante": "", "valor_ex_fabrica": 24200, "adas": 0,
-                    "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200,
-                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
-                    "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0,
-                    "equipamiento": 7119, "margen_importer_pct": 10.1, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 500000
-                },
-                "Daily Escolar 2025 Dikar 32+1": {
-                    "variante": "", "valor_ex_fabrica": 24200, "adas": 0,
-                    "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200,
-                    "flete_interno": 400, "customs": 0, "comision_vendedor": 150,
-                    "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0,
-                    "equipamiento": 5900, "margen_importer_pct": 19.6, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 500000
-                },
-                "Daily 4x4": {
-                    "variante": "", "valor_ex_fabrica": 44000, "adas": 0,
-                    "flete_seguro": 3709, "impuesto_flete": 106, "pdi": 222,
-                    "flete_interno": 250, "customs": 0, "comision_vendedor": 178,
-                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
-                    "equipamiento": 0, "margen_importer_pct": 10.3, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 500000
-                },
+                "Daily Vetrato (20+1) 2025": {"variante": "S57E5BG1A", "valor_ex_fabrica": 21800, "adas": 0, "flete_seguro": 3300, "impuesto_flete": 175, "pdi": 200, "flete_interno": 400, "customs": 0, "comision_vendedor": 150, "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0, "equipamiento": 17000, "margen_importer_pct": 9.0, "precio_lista_usd": 51382, "bono_vendedor_clp": 400000},
+                "Daily Vetrato Semi 2024 sin asiento": {"variante": "S57E5BG1A", "valor_ex_fabrica": 24200, "adas": 0, "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200, "flete_interno": 400, "customs": 0, "comision_vendedor": 150, "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0, "equipamiento": 0, "margen_importer_pct": 25.7, "precio_lista_usd": 43990, "bono_vendedor_clp": 250000},
+                "Daily Escolar 2024 Dikar 32+1": {"variante": "", "valor_ex_fabrica": 24200, "adas": 0, "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200, "flete_interno": 400, "customs": 0, "comision_vendedor": 150, "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0, "equipamiento": 5198, "margen_importer_pct": 20.1, "precio_lista_usd": 48011, "bono_vendedor_clp": 500000},
+                "Daily 18+1 2023": {"variante": "S57E5BG1A", "valor_ex_fabrica": 37000, "adas": 0, "flete_seguro": 3300, "impuesto_flete": 175, "pdi": 400, "flete_interno": 400, "customs": 0, "comision_vendedor": 150, "campana_mantencion": 0, "insonorizacion": 1500, "carroceria_origen": 0, "equipamiento": 0, "margen_importer_pct": 10.7, "precio_lista_usd": 52240, "bono_vendedor_clp": 500000},
+                "Daily 18+1 3P fábrica 2024": {"variante": "S57E5BG1A", "valor_ex_fabrica": 37000, "adas": 0, "flete_seguro": 3300, "impuesto_flete": 175, "pdi": 400, "flete_interno": 400, "customs": 0, "comision_vendedor": 200, "campana_mantencion": 0, "insonorizacion": 1500, "carroceria_origen": 0, "equipamiento": 1250, "margen_importer_pct": -9.3, "precio_lista_usd": 43990, "bono_vendedor_clp": 500000},
+                "Daily 18+1 3P": {"variante": "F33EBAQ1", "valor_ex_fabrica": 25833, "adas": 0, "flete_seguro": 3300, "impuesto_flete": 150, "pdi": 400, "flete_interno": 300, "customs": 0, "comision_vendedor": 200, "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0, "equipamiento": 0, "margen_importer_pct": 18.2, "precio_lista_usd": 40100, "bono_vendedor_clp": 500000},
+                "Daily 18+1 2P fábrica 2025": {"variante": "", "valor_ex_fabrica": 24200, "adas": 0, "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200, "flete_interno": 400, "customs": 0, "comision_vendedor": 150, "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0, "equipamiento": 0, "margen_importer_pct": 24.8, "precio_lista_usd": 43490, "bono_vendedor_clp": 500000},
+                "Daily 18+1 3P (fábrica + Dikar) 2025": {"variante": "", "valor_ex_fabrica": 24200, "adas": 0, "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200, "flete_interno": 400, "customs": 0, "comision_vendedor": 150, "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0, "equipamiento": 7119, "margen_importer_pct": 10.1, "precio_lista_usd": 44990, "bono_vendedor_clp": 500000},
+                "Daily Escolar 2025 Dikar 32+1": {"variante": "", "valor_ex_fabrica": 24200, "adas": 0, "flete_seguro": 3750, "impuesto_flete": 175, "pdi": 200, "flete_interno": 400, "customs": 0, "comision_vendedor": 150, "campana_mantencion": 0, "insonorizacion": 1200, "carroceria_origen": 0, "equipamiento": 5900, "margen_importer_pct": 19.6, "precio_lista_usd": 48620, "bono_vendedor_clp": 500000},
+                "Daily 4x4": {"variante": "", "valor_ex_fabrica": 44000, "adas": 0, "flete_seguro": 3709, "impuesto_flete": 106, "pdi": 222, "flete_interno": 250, "customs": 0, "comision_vendedor": 178, "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0, "equipamiento": 0, "margen_importer_pct": 10.3, "precio_lista_usd": 58745, "bono_vendedor_clp": 500000},
             },
             "Nuevos pedidos EURO VI IVECO": {
-                "Daily Vetrato 50-180 (20+1) VIP Dikar 2026 PD": {
-                    "variante": "", "valor_ex_fabrica": 32630, "adas": 0,
-                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
-                    "flete_interno": 0, "customs": 0, "comision_vendedor": 581,
-                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
-                    "equipamiento": 17503, "margen_importer_pct": 17.4, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 400000
-                },
-                "Daily Vetrato 50-180 (20+1) Basic Dikar 2026": {
-                    "variante": "", "valor_ex_fabrica": 33940, "adas": 0,
-                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
-                    "flete_interno": 0, "customs": 0, "comision_vendedor": 571,
-                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
-                    "equipamiento": 15243, "margen_importer_pct": 17.4, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 400000
-                },
-                "Daily Vetrato Escolar Dikar 50-180 30+2+1 2026": {
-                    "variante": "", "valor_ex_fabrica": 33940, "adas": 0,
-                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
-                    "flete_interno": 0, "customs": 0, "comision_vendedor": 476,
-                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
-                    "equipamiento": 6328, "margen_importer_pct": 17.4, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 400000
-                },
-                "Daily 19+1 Dikar PD 2026": {
-                    "variante": "", "valor_ex_fabrica": 32630, "adas": 0,
-                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
-                    "flete_interno": 0, "customs": 0, "comision_vendedor": 475,
-                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
-                    "equipamiento": 7571, "margen_importer_pct": 17.4, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 400000
-                },
-                "Daily 19+1+1 PD Dikar 2026": {
-                    "variante": "", "valor_ex_fabrica": 32630, "adas": 0,
-                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
-                    "flete_interno": 0, "customs": 0, "comision_vendedor": 479,
-                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
-                    "equipamiento": 7944, "margen_importer_pct": 17.4, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 400000
-                },
-                "Daily SOF 11+1 PD 2026": {
-                    "variante": "", "valor_ex_fabrica": 32630, "adas": 0,
-                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
-                    "flete_interno": 0, "customs": 0, "comision_vendedor": 535,
-                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
-                    "equipamiento": 13220, "margen_importer_pct": 17.4, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 400000
-                },
-                "Daily 16m3 2026": {
-                    "variante": "F6G99BB1000015", "valor_ex_fabrica": 34900, "adas": 0,
-                    "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150,
-                    "flete_interno": 0, "customs": 0, "comision_vendedor": 419,
-                    "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0,
-                    "equipamiento": 0, "margen_importer_pct": 17.5, "mg_dealer_pct": 8.0,
-                    "bono_vendedor_clp": 400000
-                },
+                "Daily Vetrato 50-180 (20+1) VIP Dikar 2026 PD": {"variante": "", "valor_ex_fabrica": 32630, "adas": 0, "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150, "flete_interno": 0, "customs": 0, "comision_vendedor": 581, "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0, "equipamiento": 17503, "margen_importer_pct": 17.4, "precio_lista_usd": 72580, "bono_vendedor_clp": 400000},
+                "Daily Vetrato 50-180 (20+1) Basic Dikar 2026": {"variante": "", "valor_ex_fabrica": 33940, "adas": 0, "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150, "flete_interno": 0, "customs": 0, "comision_vendedor": 571, "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0, "equipamiento": 15243, "margen_importer_pct": 17.4, "precio_lista_usd": 71316, "bono_vendedor_clp": 400000},
+                "Daily Vetrato Escolar Dikar 50-180 30+2+1 2026": {"variante": "", "valor_ex_fabrica": 33940, "adas": 0, "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150, "flete_interno": 0, "customs": 0, "comision_vendedor": 476, "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0, "equipamiento": 6328, "margen_importer_pct": 17.4, "precio_lista_usd": 59502, "bono_vendedor_clp": 400000},
+                "Daily 19+1 Dikar PD 2026": {"variante": "", "valor_ex_fabrica": 32630, "adas": 0, "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150, "flete_interno": 0, "customs": 0, "comision_vendedor": 475, "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0, "equipamiento": 7571, "margen_importer_pct": 17.4, "precio_lista_usd": 59378, "bono_vendedor_clp": 400000},
+                "Daily 19+1+1 PD Dikar 2026": {"variante": "", "valor_ex_fabrica": 32630, "adas": 0, "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150, "flete_interno": 0, "customs": 0, "comision_vendedor": 479, "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0, "equipamiento": 7944, "margen_importer_pct": 17.4, "precio_lista_usd": 59877, "bono_vendedor_clp": 400000},
+                "Daily SOF 11+1 PD 2026": {"variante": "", "valor_ex_fabrica": 32630, "adas": 0, "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150, "flete_interno": 0, "customs": 0, "comision_vendedor": 535, "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0, "equipamiento": 13220, "margen_importer_pct": 17.4, "precio_lista_usd": 66893, "bono_vendedor_clp": 400000},
+                "Daily 16m3 2026": {"variante": "F6G99BB1000015", "valor_ex_fabrica": 34900, "adas": 0, "flete_seguro": 4200, "impuesto_flete": 100, "pdi": 150, "flete_interno": 0, "customs": 0, "comision_vendedor": 419, "campana_mantencion": 0, "insonorizacion": 0, "carroceria_origen": 0, "equipamiento": 0, "margen_importer_pct": 17.5, "precio_lista_usd": 52378, "bono_vendedor_clp": 400000},
             }
         }
 
         # =========================================================
-        # 1. SELECCIÓN
+        # BASE PREDETERMINADA FOTON
+        # =========================================================
+        FOTON_MODELOS = {
+            "Buses eléctricos": {
+                "Foton U9 255 kWh": {"bateria": 255, "final_cost": 129319.40, "precio_con_iva": 178030.664},
+                "Foton U12 382 kWh": {"bateria": 382, "final_cost": 157355.92, "precio_con_iva": 200000.00},
+                "Foton U12 347 kWh": {"bateria": 347, "final_cost": 152677.32, "precio_con_iva": 194000.00},
+                "Foton U12 282 kWh": {"bateria": 282, "final_cost": 149503.92, "precio_con_iva": 192000.00},
+                "Foton U10 310 kWh": {"bateria": 310, "final_cost": 143899.60, "precio_con_iva": 178030.664},
+                "Foton U9 266 kWh": {"bateria": 266, "final_cost": 130426.96, "precio_con_iva": 178030.664},
+                "Foton U9 232 kWh": {"bateria": 232, "final_cost": 125765.92, "precio_con_iva": 178030.664},
+            },
+            "Buses diésel": {
+                "Foton DU10": {"bateria": 0, "final_cost": 110008.00, "precio_con_iva": 178031.664},
+                "Foton DU9": {"bateria": 0, "final_cost": 99340.00, "precio_con_iva": 178031.664},
+            },
+            "Chasis": {
+                "Chasis FO Euro VI mixto": {"bateria": 0, "final_cost": 22552.00, "precio_con_iva": 35640.50},
+                "Chasis FO Euro VI disco": {"bateria": 0, "final_cost": 23568.00, "precio_con_iva": 36830.50},
+                "Chasis U12 382 kWh": {"bateria": 382, "final_cost": 182659.92, "precio_con_iva": 178030.664},
+                "Chasis U12 347 kWh": {"bateria": 347, "final_cost": 178489.32, "precio_con_iva": 178030.664},
+            }
+        }
+
+        # =========================================================
+        # SELECTOR GENERAL
         # =========================================================
         st.markdown("""
         <div class="box-costo">
-            <div class="titulo-box">1. Selección del modelo</div>
-            <div class="sub-box">Seleccione la clasificación y el modelo IVECO a evaluar.</div>
+            <div class="titulo-box">1. Selección comercial</div>
+            <div class="sub-box">Seleccione marca, clasificación y modelo para ejecutar la simulación comercial.</div>
         </div>
         """, unsafe_allow_html=True)
 
-        c0, c1, c2 = st.columns([1.3, 2.4, 1])
-
-        with c0:
-            clasificacion = st.selectbox("Clasificación", list(IVECO_MODELOS.keys()), key="iveco_clasificacion")
-
-        modelos_disponibles = list(IVECO_MODELOS[clasificacion].keys())
-
-        with c1:
-            modelo = st.selectbox("Modelo", modelos_disponibles, key="iveco_modelo")
-
-        base = IVECO_MODELOS[clasificacion][modelo]
-        modelo_key = limpiar_key(f"{clasificacion}_{modelo}")
-
-        with c2:
-            if st.button("Restablecer valores"):
-                for k in list(st.session_state.keys()):
-                    if modelo_key in k:
-                        del st.session_state[k]
-                st.rerun()
-
-        try:
-            dolar_bcch, _ = obtener_dolar_observado_bcch()
-            dolar_usado = float(dolar_bcch) if dolar_bcch else 885.0
-        except Exception:
-            dolar_usado = 885.0
-
+        marca = st.selectbox("Marca", ["IVECO", "FOTON"], key="marca_calculadora_costos")
+        dolar_usado = get_dolar_bcch()
         st.metric("Dólar observado BCCh", fmt_clp_dec(dolar_usado))
 
         # =========================================================
-        # 2. COSTOS
+        # CALCULADORA IVECO
         # =========================================================
-        st.markdown("""
-        <div class="box-costo">
-            <div class="titulo-box">2. Estructura de costo</div>
-            <div class="sub-box">Zona celeste: costos base del modelo.</div>
-        </div>
-        """, unsafe_allow_html=True)
+        if marca == "IVECO":
+            c0, c1, c2 = st.columns([1.3, 2.4, 1])
 
-        costo_disabled = not es_admin_costos
+            with c0:
+                clasificacion = st.selectbox("Clasificación", list(IVECO_MODELOS.keys()), key="iveco_clasificacion")
 
-        b1, b2, b3, b4 = st.columns(4)
+            modelos_disponibles = list(IVECO_MODELOS[clasificacion].keys())
 
-        with b1:
-            valor_ex_fabrica = st.number_input("Valor ex fábrica USD", value=float(base["valor_ex_fabrica"]), step=500.0, disabled=costo_disabled, key=f"valor_ex_fabrica_{modelo_key}")
-            adas = st.number_input("ADAS USD", value=float(base["adas"]), step=100.0, disabled=costo_disabled, key=f"adas_{modelo_key}")
-            flete_seguro = st.number_input("Flete + seguro USD", value=float(base["flete_seguro"]), step=100.0, disabled=costo_disabled, key=f"flete_seguro_{modelo_key}")
+            with c1:
+                modelo = st.selectbox("Modelo", modelos_disponibles, key="iveco_modelo")
 
-        with b2:
-            impuesto_flete = st.number_input("Impuesto flete puerto USD", value=float(base["impuesto_flete"]), step=50.0, disabled=costo_disabled, key=f"impuesto_flete_{modelo_key}")
-            pdi = st.number_input("PDI USD", value=float(base["pdi"]), step=50.0, disabled=costo_disabled, key=f"pdi_{modelo_key}")
-            flete_interno = st.number_input("Flete interno USD", value=float(base["flete_interno"]), step=50.0, disabled=costo_disabled, key=f"flete_interno_{modelo_key}")
+            base = IVECO_MODELOS[clasificacion][modelo]
+            modelo_key = limpiar_key(f"iveco_{clasificacion}_{modelo}")
 
-        with b3:
-            customs = st.number_input("Customs USD", value=float(base["customs"]), step=50.0, disabled=costo_disabled, key=f"customs_{modelo_key}")
-            comision_vendedor = st.number_input("Comisión vendedor USD", value=float(base["comision_vendedor"]), step=50.0, disabled=costo_disabled, key=f"comision_vendedor_{modelo_key}")
-            campana_mantencion = st.number_input("Campaña mantención USD", value=float(base["campana_mantencion"]), step=100.0, disabled=costo_disabled, key=f"campana_mantencion_{modelo_key}")
+            with c2:
+                if st.button("Restablecer valores", key=f"reset_{modelo_key}"):
+                    for k in list(st.session_state.keys()):
+                        if modelo_key in k:
+                            del st.session_state[k]
+                    st.rerun()
 
-        with b4:
-            insonorizacion = st.number_input("Insonorización y refuerzos USD", value=float(base["insonorizacion"]), step=100.0, disabled=costo_disabled, key=f"insonorizacion_{modelo_key}")
-            carroceria_origen = st.number_input("Carrocería de origen USD", value=float(base["carroceria_origen"]), step=100.0, disabled=costo_disabled, key=f"carroceria_origen_{modelo_key}")
-            equipamiento = st.number_input("EE.EE / asientos / equipamiento USD", value=float(base["equipamiento"]), step=100.0, disabled=costo_disabled, key=f"equipamiento_{modelo_key}")
-
-        total_costo_usd = (
-            valor_ex_fabrica + adas + flete_seguro + impuesto_flete + pdi +
-            flete_interno + customs + comision_vendedor + campana_mantencion +
-            insonorizacion + carroceria_origen + equipamiento
-        )
-
-        cc1, cc2 = st.columns(2)
-        cc1.metric("Total costo USD", fmt_usd(total_costo_usd))
-        cc2.metric("Total costo CLP", fmt_clp(total_costo_usd * dolar_usado))
-
-        # =========================================================
-        # 3. MARGEN IMPORTER Y PRECIO LISTA
-        # =========================================================
-        st.markdown("""
-        <div class="box-margen">
-            <div class="titulo-box">3. Margen Importer y precio lista</div>
-            <div class="sub-box">Zona naranjo: al variar el Margen Importer % objetivo y el Precio Lista USD, se calcula automáticamente el Precio Venta Dealer y el % Mg Dealer CCS requerido.</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        precio_disabled = not (es_admin_costos or es_rodrigo)
-
-        p1, p2, p3, p4 = st.columns(4)
-
-        with p1:
-            margen_importer_pct_obj = st.number_input(
-                "Margen Importer % objetivo",
-                value=float(base["margen_importer_pct"]),
-                step=0.5,
-                disabled=precio_disabled,
-                key=f"margen_importer_{modelo_key}"
-            )
-
-        with p2:
-            precio_lista_usd = st.number_input(
-                "Precio Lista USD",
-                value=float(base.get("precio_lista_usd", total_costo_usd * 1.25)),
-                step=500.0,
-                disabled=precio_disabled,
-                key=f"precio_lista_manual_{modelo_key}"
-            )
-
-        with p3:
-            cantidad = st.number_input(
-                "Cantidad unidades",
-                value=1,
-                min_value=1,
-                step=1,
-                disabled=precio_disabled,
-                key=f"cantidad_{modelo_key}"
-            )
-
-        with p4:
-            bono_vendedor_clp = st.number_input(
-                "Bono vendedor interno CLP",
-                value=float(base["bono_vendedor_clp"]),
-                step=50000.0,
-                disabled=not es_admin_costos,
-                key=f"bono_vendedor_{modelo_key}"
-            )
-
-        # Fórmulas corregidas:
-        # 1) Margen Importer % objetivo define el Precio Venta Dealer.
-        # 2) Precio Lista USD se mantiene como referencia comercial.
-        # 3) % Mg Dealer CCS se calcula automáticamente.
-        precio_venta_dealer = (
-            total_costo_usd / (1 - margen_importer_pct_obj / 100)
-            if margen_importer_pct_obj < 100 else 0
-        )
-
-        mg_dealer_pct = (
-            (1 - (precio_venta_dealer / precio_lista_usd)) * 100
-            if precio_lista_usd > 0 else 0
-        )
-
-        margen_importer_usd = precio_venta_dealer - total_costo_usd
-
-        margen_importer_pct_real = (
-            margen_importer_usd / precio_venta_dealer * 100
-            if precio_venta_dealer > 0 else 0
-        )
-
-        bono_vendedor_usd = bono_vendedor_clp / dolar_usado if dolar_usado > 0 else 0
-        margen_neto_unitario = margen_importer_usd - bono_vendedor_usd
-
-        ingreso_total = precio_venta_dealer * cantidad
-        costo_total = total_costo_usd * cantidad
-        margen_total = margen_importer_usd * cantidad
-        margen_neto_total = margen_neto_unitario * cantidad
-
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Precio Venta Dealer USD calculado", fmt_usd(precio_venta_dealer))
-        m2.metric("% Mg Dealer CCS requerido", f"{mg_dealer_pct:.1f}%")
-        m3.metric("Margen Importer USD", fmt_usd(margen_importer_usd))
-
-        # =========================================================
-        # 4. PRECIOS CALCULADOS
-        # =========================================================
-        st.markdown("""
-        <div class="box-precio">
-            <div class="titulo-box">4. Precio calculado</div>
-            <div class="sub-box">Zona amarilla: precios calculados automáticamente desde Margen Importer % objetivo y Precio Lista USD.</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        y1, y2, y3 = st.columns(3)
-        y1.metric("Precio Lista USD", fmt_usd(precio_lista_usd))
-        y2.metric("Precio Lista CLP", fmt_clp(precio_lista_usd * dolar_usado))
-        y3.metric("Precio Venta Dealer USD", fmt_usd(precio_venta_dealer))
-
-        # =========================================================
-        # 5. RESULTADO
-        # =========================================================
-        st.markdown("""
-        <div class="box-resultado">
-            <div class="titulo-box">5. Margen Importer y resultado del negocio</div>
-            <div class="sub-box">Zona verde: resultado final de margen por unidad y margen total del negocio.</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        r1, r2, r3, r4 = st.columns(4)
-        r1.metric("Margen Importer USD", fmt_usd(margen_importer_usd))
-        r2.metric("Margen Importer %", f"{margen_importer_pct_real:.1f}%")
-        r3.metric("Margen neto unitario", fmt_usd(margen_neto_unitario))
-        r4.metric("Margen neto negocio", fmt_usd(margen_neto_total))
-
-        r5, r6, r7, r8 = st.columns(4)
-        r5.metric("Ingreso total USD", fmt_usd(ingreso_total))
-        r6.metric("Costo total USD", fmt_usd(costo_total))
-        r7.metric("Margen total USD", fmt_usd(margen_total))
-        r8.metric("Bono vendedor USD", fmt_usd(bono_vendedor_usd))
-
-        with st.expander("🧠 Ver lógica de cálculo"):
             st.markdown("""
-            **Orden de cálculo utilizado:**
+            <div class="box-costo">
+                <div class="titulo-box">2. Estructura de costo IVECO</div>
+                <div class="sub-box">Zona celeste: costos base del modelo.</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            1. **Total costo USD** = suma de costos base del modelo.  
-            2. **Precio Venta Dealer USD** = Total costo USD / (1 - Margen Importer %).  
-            3. **Precio Lista USD** = Precio Venta Dealer USD / (1 - % Mg Dealer CCS).  
-            4. **Margen Importer USD** = Precio Venta Dealer USD - Total costo USD.  
-            5. **Margen Importer %** = Margen Importer USD / Precio Venta Dealer USD.  
-            """)
+            costo_disabled = not es_admin_costos
+            b1, b2, b3, b4 = st.columns(4)
 
-        st.markdown("### Resumen comercial")
+            with b1:
+                valor_ex_fabrica = st.number_input("Valor ex fábrica USD", value=float(base["valor_ex_fabrica"]), step=500.0, disabled=costo_disabled, key=f"valor_ex_fabrica_{modelo_key}")
+                adas = st.number_input("ADAS USD", value=float(base["adas"]), step=100.0, disabled=costo_disabled, key=f"adas_{modelo_key}")
+                flete_seguro = st.number_input("Flete + seguro USD", value=float(base["flete_seguro"]), step=100.0, disabled=costo_disabled, key=f"flete_seguro_{modelo_key}")
 
-        resumen = pd.DataFrame({
-            "Concepto": [
-                "Clasificación", "Modelo", "Variante", "Dólar BCCh",
-                "Total costo USD", "Total costo CLP",
-                "Margen Importer % objetivo", "% Mg Dealer CCS",
-                "Precio Venta Dealer USD", "Precio Lista USD", "Precio Lista CLP",
-                "Margen Importer USD", "Margen Importer % real",
-                "Bono vendedor CLP", "Bono vendedor USD",
-                "Margen neto unitario USD", "Cantidad unidades",
-                "Ingreso total USD", "Costo total USD",
-                "Margen total USD", "Margen neto total USD"
-            ],
-            "Valor": [
-                clasificacion, modelo, base["variante"], fmt_clp_dec(dolar_usado),
-                fmt_usd(total_costo_usd), fmt_clp(total_costo_usd * dolar_usado),
-                f"{margen_importer_pct_obj:.1f}%", f"{mg_dealer_pct:.1f}%",
-                fmt_usd(precio_venta_dealer), fmt_usd(precio_lista_usd),
-                fmt_clp(precio_lista_usd * dolar_usado),
-                fmt_usd(margen_importer_usd), f"{margen_importer_pct_real:.1f}%",
-                fmt_clp(bono_vendedor_clp), fmt_usd(bono_vendedor_usd),
-                fmt_usd(margen_neto_unitario), cantidad,
-                fmt_usd(ingreso_total), fmt_usd(costo_total),
-                fmt_usd(margen_total), fmt_usd(margen_neto_total)
-            ]
-        })
+            with b2:
+                impuesto_flete = st.number_input("Impuesto flete puerto USD", value=float(base["impuesto_flete"]), step=50.0, disabled=costo_disabled, key=f"impuesto_flete_{modelo_key}")
+                pdi = st.number_input("PDI USD", value=float(base["pdi"]), step=50.0, disabled=costo_disabled, key=f"pdi_{modelo_key}")
+                flete_interno = st.number_input("Flete interno USD", value=float(base["flete_interno"]), step=50.0, disabled=costo_disabled, key=f"flete_interno_{modelo_key}")
 
-        st.dataframe(resumen, use_container_width=True, hide_index=True)
+            with b3:
+                customs = st.number_input("Customs USD", value=float(base["customs"]), step=50.0, disabled=costo_disabled, key=f"customs_{modelo_key}")
+                comision_vendedor = st.number_input("Comisión vendedor USD", value=float(base["comision_vendedor"]), step=50.0, disabled=costo_disabled, key=f"comision_vendedor_{modelo_key}")
+                campana_mantencion = st.number_input("Campaña mantención USD", value=float(base["campana_mantencion"]), step=100.0, disabled=costo_disabled, key=f"campana_mantencion_{modelo_key}")
+
+            with b4:
+                insonorizacion = st.number_input("Insonorización y refuerzos USD", value=float(base["insonorizacion"]), step=100.0, disabled=costo_disabled, key=f"insonorizacion_{modelo_key}")
+                carroceria_origen = st.number_input("Carrocería de origen USD", value=float(base["carroceria_origen"]), step=100.0, disabled=costo_disabled, key=f"carroceria_origen_{modelo_key}")
+                equipamiento = st.number_input("EE.EE / asientos / equipamiento USD", value=float(base["equipamiento"]), step=100.0, disabled=costo_disabled, key=f"equipamiento_{modelo_key}")
+
+            total_costo_usd = valor_ex_fabrica + adas + flete_seguro + impuesto_flete + pdi + flete_interno + customs + comision_vendedor + campana_mantencion + insonorizacion + carroceria_origen + equipamiento
+
+            cc1, cc2 = st.columns(2)
+            cc1.metric("Total costo USD", fmt_usd(total_costo_usd))
+            cc2.metric("Total costo CLP", fmt_clp(total_costo_usd * dolar_usado))
+
+            st.markdown("""
+            <div class="box-margen">
+                <div class="titulo-box">3. Margen Importer y precio lista</div>
+                <div class="sub-box">Al variar el Margen Importer % objetivo y el Precio Lista USD, se calcula automáticamente el Precio Venta Dealer y el % Mg Dealer CCS requerido.</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            precio_disabled = not puede_simular
+            p1, p2, p3, p4 = st.columns(4)
+
+            with p1:
+                margen_importer_pct_obj = st.number_input("Margen Importer % objetivo", value=float(base["margen_importer_pct"]), step=0.5, disabled=precio_disabled, key=f"margen_importer_{modelo_key}")
+
+            with p2:
+                precio_lista_usd = st.number_input("Precio Lista USD", value=float(base.get("precio_lista_usd", total_costo_usd * 1.25)), step=500.0, disabled=precio_disabled, key=f"precio_lista_manual_{modelo_key}")
+
+            with p3:
+                cantidad = st.number_input("Cantidad unidades", value=1, min_value=1, step=1, disabled=precio_disabled, key=f"cantidad_{modelo_key}")
+
+            with p4:
+                bono_vendedor_clp = st.number_input("Bono vendedor interno CLP", value=float(base["bono_vendedor_clp"]), step=50000.0, disabled=not es_admin_costos, key=f"bono_vendedor_{modelo_key}")
+
+            precio_venta_dealer = total_costo_usd / (1 - margen_importer_pct_obj / 100) if margen_importer_pct_obj < 100 else 0
+            mg_dealer_pct = (1 - (precio_venta_dealer / precio_lista_usd)) * 100 if precio_lista_usd > 0 else 0
+            margen_importer_usd = precio_venta_dealer - total_costo_usd
+            margen_importer_pct_real = margen_importer_usd / precio_venta_dealer * 100 if precio_venta_dealer > 0 else 0
+            bono_vendedor_usd = bono_vendedor_clp / dolar_usado if dolar_usado > 0 else 0
+            margen_neto_unitario = margen_importer_usd - bono_vendedor_usd
+            ingreso_total = precio_venta_dealer * cantidad
+            costo_total = total_costo_usd * cantidad
+            margen_total = margen_importer_usd * cantidad
+            margen_neto_total = margen_neto_unitario * cantidad
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Precio Venta Dealer USD calculado", fmt_usd(precio_venta_dealer))
+            m2.metric("% Mg Dealer CCS requerido", f"{mg_dealer_pct:.1f}%")
+            m3.metric("Margen Importer USD", fmt_usd(margen_importer_usd))
+
+            st.markdown("""
+            <div class="box-precio">
+                <div class="titulo-box">4. Precio calculado</div>
+                <div class="sub-box">Zona amarilla: precios calculados automáticamente desde Margen Importer % objetivo y Precio Lista USD.</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            y1, y2, y3 = st.columns(3)
+            y1.metric("Precio Lista USD", fmt_usd(precio_lista_usd))
+            y2.metric("Precio Lista CLP", fmt_clp(precio_lista_usd * dolar_usado))
+            y3.metric("Precio Venta Dealer USD", fmt_usd(precio_venta_dealer))
+
+            if margen_importer_usd < 0:
+                st.markdown("""
+                <div class="box-alerta">
+                    <div class="titulo-box">⚠️ Margen negativo</div>
+                    <div class="sub-box">La configuración actual genera pérdida comercial.</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="box-resultado">
+                <div class="titulo-box">5. Margen Importer y resultado del negocio</div>
+                <div class="sub-box">Zona verde: resultado final de margen por unidad y margen total del negocio.</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            r1, r2, r3, r4 = st.columns(4)
+            r1.metric("Margen Importer USD", fmt_usd(margen_importer_usd))
+            r2.metric("Margen Importer %", f"{margen_importer_pct_real:.1f}%")
+            r3.metric("Margen neto unitario", fmt_usd(margen_neto_unitario))
+            r4.metric("Margen neto negocio", fmt_usd(margen_neto_total))
+
+            r5, r6, r7, r8 = st.columns(4)
+            r5.metric("Ingreso total USD", fmt_usd(ingreso_total))
+            r6.metric("Costo total USD", fmt_usd(costo_total))
+            r7.metric("Margen total USD", fmt_usd(margen_total))
+            r8.metric("Bono vendedor USD", fmt_usd(bono_vendedor_usd))
+
+            with st.expander("🧠 Ver lógica de cálculo IVECO"):
+                st.markdown("""
+                1. **Total costo USD** = suma de costos base del modelo.  
+                2. **Precio Venta Dealer USD** = Total costo USD / (1 - Margen Importer %).  
+                3. **% Mg Dealer CCS requerido** = 1 - (Precio Venta Dealer / Precio Lista).  
+                4. **Margen Importer USD** = Precio Venta Dealer USD - Total costo USD.  
+                """)
+
+            resumen = pd.DataFrame({
+                "Concepto": ["Marca", "Clasificación", "Modelo", "Variante", "Dólar BCCh", "Total costo USD", "Total costo CLP", "Margen Importer % objetivo", "% Mg Dealer CCS requerido", "Precio Venta Dealer USD", "Precio Lista USD", "Precio Lista CLP", "Margen Importer USD", "Margen Importer % real", "Bono vendedor CLP", "Bono vendedor USD", "Margen neto unitario USD", "Cantidad unidades", "Ingreso total USD", "Costo total USD", "Margen total USD", "Margen neto total USD"],
+                "Valor": ["IVECO", clasificacion, modelo, base["variante"], fmt_clp_dec(dolar_usado), fmt_usd(total_costo_usd), fmt_clp(total_costo_usd * dolar_usado), f"{margen_importer_pct_obj:.1f}%", f"{mg_dealer_pct:.1f}%", fmt_usd(precio_venta_dealer), fmt_usd(precio_lista_usd), fmt_clp(precio_lista_usd * dolar_usado), fmt_usd(margen_importer_usd), f"{margen_importer_pct_real:.1f}%", fmt_clp(bono_vendedor_clp), fmt_usd(bono_vendedor_usd), fmt_usd(margen_neto_unitario), cantidad, fmt_usd(ingreso_total), fmt_usd(costo_total), fmt_usd(margen_total), fmt_usd(margen_neto_total)]
+            })
+            st.markdown("### Resumen comercial IVECO")
+            st.dataframe(resumen, use_container_width=True, hide_index=True)
+
+        # =========================================================
+        # CALCULADORA FOTON
+        # =========================================================
+        if marca == "FOTON":
+            f0, f1, f2 = st.columns([1.3, 2.4, 1])
+
+            with f0:
+                clasificacion_foton = st.selectbox("Clasificación", list(FOTON_MODELOS.keys()), key="foton_clasificacion")
+
+            with f1:
+                modelo_foton = st.selectbox("Modelo", list(FOTON_MODELOS[clasificacion_foton].keys()), key="foton_modelo")
+
+            base_foton = FOTON_MODELOS[clasificacion_foton][modelo_foton]
+            modelo_key_foton = limpiar_key(f"foton_{clasificacion_foton}_{modelo_foton}")
+
+            with f2:
+                if st.button("Restablecer valores", key=f"reset_{modelo_key_foton}"):
+                    for k in list(st.session_state.keys()):
+                        if modelo_key_foton in k:
+                            del st.session_state[k]
+                    st.rerun()
+
+            st.markdown("""
+            <div class="box-costo">
+                <div class="titulo-box">2. Costo base FOTON</div>
+                <div class="sub-box">Costo final del modelo utilizado para calcular margen.</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            final_cost = st.number_input("Final Cost USD", value=float(base_foton["final_cost"]), step=500.0, disabled=not es_admin_costos, key=f"foton_final_cost_{modelo_key_foton}")
+
+            st.markdown("""
+            <div class="box-margen">
+                <div class="titulo-box">3. Búsqueda de valor objetivo FOTON</div>
+                <div class="sub-box">Permite simular precio neto sin IVA, precio con IVA y margen objetivo.</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            modo_precio = st.radio(
+                "Modo de cálculo",
+                ["Ingresar precio con IVA", "Ingresar precio neto sin IVA", "Buscar por margen objetivo"],
+                horizontal=True,
+                key=f"foton_modo_{modelo_key_foton}"
+            )
+
+            iva_factor = 1.19
+
+            if modo_precio == "Ingresar precio con IVA":
+                precio_con_iva = st.number_input("Precio venta con IVA USD", value=float(base_foton["precio_con_iva"]), step=500.0, disabled=not puede_simular, key=f"foton_precio_iva_{modelo_key_foton}")
+                precio_neto = precio_con_iva / iva_factor
+
+            elif modo_precio == "Ingresar precio neto sin IVA":
+                precio_neto = st.number_input("Precio NETO USD sin IVA", value=float(base_foton["precio_con_iva"]) / iva_factor, step=500.0, disabled=not puede_simular, key=f"foton_precio_neto_{modelo_key_foton}")
+                precio_con_iva = precio_neto * iva_factor
+
+            else:
+                margen_objetivo_pct = st.number_input("Margen objetivo %", value=12.0, min_value=-50.0, max_value=80.0, step=0.5, disabled=not puede_simular, key=f"foton_margen_obj_{modelo_key_foton}")
+                precio_neto = final_cost / (1 - margen_objetivo_pct / 100) if margen_objetivo_pct < 100 else 0
+                precio_con_iva = precio_neto * iva_factor
+
+            cantidad_foton = st.number_input("Cantidad unidades", value=1, min_value=1, step=1, disabled=not puede_simular, key=f"foton_cantidad_{modelo_key_foton}")
+
+            iva_usd = precio_con_iva - precio_neto
+            margen_usd = precio_neto - final_cost
+            margen_pct = margen_usd / precio_neto * 100 if precio_neto > 0 else 0
+            ingreso_total_neto = precio_neto * cantidad_foton
+            ingreso_total_iva = precio_con_iva * cantidad_foton
+            costo_total_foton = final_cost * cantidad_foton
+            margen_total_foton = margen_usd * cantidad_foton
+
+            st.markdown("""
+            <div class="box-precio">
+                <div class="titulo-box">4. Precio calculado FOTON</div>
+                <div class="sub-box">Valores netos, IVA y precio final cliente.</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            fp1, fp2, fp3, fp4 = st.columns(4)
+            fp1.metric("Precio NETO USD", fmt_usd(precio_neto))
+            fp2.metric("IVA USD", fmt_usd(iva_usd))
+            fp3.metric("Precio con IVA USD", fmt_usd(precio_con_iva))
+            fp4.metric("Precio con IVA CLP", fmt_clp(precio_con_iva * dolar_usado))
+
+            if margen_usd < 0:
+                st.markdown("""
+                <div class="box-alerta">
+                    <div class="titulo-box">⚠️ Margen negativo</div>
+                    <div class="sub-box">La configuración actual genera pérdida comercial.</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="box-resultado">
+                <div class="titulo-box">5. Margen y resultado FOTON</div>
+                <div class="sub-box">Resultado final por unidad y por negocio.</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            fr1, fr2, fr3, fr4 = st.columns(4)
+            fr1.metric("Final Cost USD", fmt_usd(final_cost))
+            fr2.metric("Margen USD unidad", fmt_usd(margen_usd))
+            fr3.metric("Margen %", f"{margen_pct:.1f}%")
+            fr4.metric("Margen total USD", fmt_usd(margen_total_foton))
+
+            fr5, fr6, fr7, fr8 = st.columns(4)
+            fr5.metric("Ingreso neto total USD", fmt_usd(ingreso_total_neto))
+            fr6.metric("Ingreso total c/IVA USD", fmt_usd(ingreso_total_iva))
+            fr7.metric("Costo total USD", fmt_usd(costo_total_foton))
+            fr8.metric("Dólar BCCh", fmt_clp_dec(dolar_usado))
+
+            with st.expander("🧠 Ver lógica de cálculo FOTON"):
+                st.markdown("""
+                1. **Final Cost USD** = costo final del modelo.  
+                2. **Precio NETO USD** = Precio con IVA / 1,19.  
+                3. **IVA USD** = Precio con IVA - Precio neto.  
+                4. **Margen USD** = Precio neto - Final Cost.  
+                5. **Margen %** = Margen USD / Precio neto.  
+                """)
+
+            resumen_foton = pd.DataFrame({
+                "Concepto": ["Marca", "Clasificación", "Modelo", "Batería", "Dólar BCCh", "Final Cost USD", "Precio NETO USD", "IVA USD", "Precio con IVA USD", "Precio con IVA CLP", "Margen USD unidad", "Margen %", "Cantidad unidades", "Ingreso total neto USD", "Ingreso total c/IVA USD", "Costo total USD", "Margen total USD"],
+                "Valor": ["FOTON", clasificacion_foton, modelo_foton, base_foton["bateria"], fmt_clp_dec(dolar_usado), fmt_usd(final_cost), fmt_usd(precio_neto), fmt_usd(iva_usd), fmt_usd(precio_con_iva), fmt_clp(precio_con_iva * dolar_usado), fmt_usd(margen_usd), f"{margen_pct:.1f}%", cantidad_foton, fmt_usd(ingreso_total_neto), fmt_usd(ingreso_total_iva), fmt_usd(costo_total_foton), fmt_usd(margen_total_foton)]
+            })
+
+            st.markdown("### Resumen comercial FOTON")
+            st.dataframe(resumen_foton, use_container_width=True, hide_index=True)
