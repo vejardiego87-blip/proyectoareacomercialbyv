@@ -1591,23 +1591,110 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
         # =========================================================
         FOTON_MODELOS = {
             "Buses eléctricos": {
-                "Foton U9 255 kWh": {"bateria": 255, "final_cost": 129319.40, "precio_con_iva": 178030.664},
-                "Foton U12 382 kWh": {"bateria": 382, "final_cost": 157355.92, "precio_con_iva": 200000.00},
-                "Foton U12 347 kWh": {"bateria": 347, "final_cost": 152677.32, "precio_con_iva": 194000.00},
-                "Foton U12 282 kWh": {"bateria": 282, "final_cost": 149503.92, "precio_con_iva": 192000.00},
-                "Foton U10 310 kWh": {"bateria": 310, "final_cost": 143899.60, "precio_con_iva": 178030.664},
-                "Foton U9 266 kWh": {"bateria": 266, "final_cost": 130426.96, "precio_con_iva": 178030.664},
-                "Foton U9 232 kWh": {"bateria": 232, "final_cost": 125765.92, "precio_con_iva": 178030.664},
+                "Foton U9 255 kWh": {
+                    "bateria_kwh": 255,
+                    "fob_all_in": 125000,
+                    "ocean_freight": 0,
+                    "costo_flete_extra": 0,
+                    "insurance_customs_port": 0,
+                    "traslado_extra": 0,
+                    "gastos_pdi": 0,
+                    "mantencion_correctiva": 0,
+                    "repuestos_gratis": 0,
+                    "adas_letreros": 0,
+                    "asesor": 0,
+                    "telemetria_anual": 180,
+                    "anos_telem": 1,
+                    "costo_apertura_pct": 1.60,
+                    "cm_free_anual": 3500,
+                    "anos_cm": 1,
+                    "capital_trabajo": 0,
+                    "precio_con_iva": 178030.664,
+                },
+                "Foton U12 382 kWh": {
+                    "bateria_kwh": 382,
+                    "fob_all_in": 150000,
+                    "ocean_freight": 0,
+                    "costo_flete_extra": 0,
+                    "insurance_customs_port": 0,
+                    "traslado_extra": 0,
+                    "gastos_pdi": 0,
+                    "mantencion_correctiva": 0,
+                    "repuestos_gratis": 0,
+                    "adas_letreros": 0,
+                    "asesor": 0,
+                    "telemetria_anual": 180,
+                    "anos_telem": 1,
+                    "costo_apertura_pct": 1.60,
+                    "cm_free_anual": 3500,
+                    "anos_cm": 1,
+                    "capital_trabajo": 0,
+                    "precio_con_iva": 200000,
+                },
             },
             "Buses diésel": {
-                "Foton DU10": {"bateria": 0, "final_cost": 110008.00, "precio_con_iva": 178031.664},
-                "Foton DU9": {"bateria": 0, "final_cost": 99340.00, "precio_con_iva": 178031.664},
+                "Foton DU10": {
+                    "bateria_kwh": 0,
+                    "fob_all_in": 105000,
+                    "ocean_freight": 0,
+                    "costo_flete_extra": 0,
+                    "insurance_customs_port": 0,
+                    "traslado_extra": 0,
+                    "gastos_pdi": 0,
+                    "mantencion_correctiva": 0,
+                    "repuestos_gratis": 0,
+                    "adas_letreros": 0,
+                    "asesor": 0,
+                    "telemetria_anual": 180,
+                    "anos_telem": 1,
+                    "costo_apertura_pct": 1.60,
+                    "cm_free_anual": 3500,
+                    "anos_cm": 1,
+                    "capital_trabajo": 0,
+                    "precio_con_iva": 178031.664,
+                },
             },
             "Chasis": {
-                "Chasis FO Euro VI mixto": {"bateria": 0, "final_cost": 22552.00, "precio_con_iva": 35640.50},
-                "Chasis FO Euro VI disco": {"bateria": 0, "final_cost": 23568.00, "precio_con_iva": 36830.50},
-                "Chasis U12 382 kWh": {"bateria": 382, "final_cost": 182659.92, "precio_con_iva": 178030.664},
-                "Chasis U12 347 kWh": {"bateria": 347, "final_cost": 178489.32, "precio_con_iva": 178030.664},
+                "Chasis FO Euro VI mixto": {
+                    "bateria_kwh": 0,
+                    "fob_all_in": 22000,
+                    "ocean_freight": 0,
+                    "costo_flete_extra": 0,
+                    "insurance_customs_port": 0,
+                    "traslado_extra": 0,
+                    "gastos_pdi": 0,
+                    "mantencion_correctiva": 0,
+                    "repuestos_gratis": 0,
+                    "adas_letreros": 0,
+                    "asesor": 0,
+                    "telemetria_anual": 0,
+                    "anos_telem": 0,
+                    "costo_apertura_pct": 1.60,
+                    "cm_free_anual": 0,
+                    "anos_cm": 0,
+                    "capital_trabajo": 0,
+                    "precio_con_iva": 35640.50,
+                },
+                "Chasis FO Euro VI disco": {
+                    "bateria_kwh": 0,
+                    "fob_all_in": 23000,
+                    "ocean_freight": 0,
+                    "costo_flete_extra": 0,
+                    "insurance_customs_port": 0,
+                    "traslado_extra": 0,
+                    "gastos_pdi": 0,
+                    "mantencion_correctiva": 0,
+                    "repuestos_gratis": 0,
+                    "adas_letreros": 0,
+                    "asesor": 0,
+                    "telemetria_anual": 0,
+                    "anos_telem": 0,
+                    "costo_apertura_pct": 1.60,
+                    "cm_free_anual": 0,
+                    "anos_cm": 0,
+                    "capital_trabajo": 0,
+                    "precio_con_iva": 36830.50,
+                },
             }
         }
 
@@ -1806,7 +1893,181 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             </div>
             """, unsafe_allow_html=True)
 
-            final_cost = st.number_input("Final Cost USD", value=float(base_foton["final_cost"]), step=500.0, disabled=not es_admin_costos, key=f"foton_final_cost_{modelo_key_foton}")
+            fc1, fc2, fc3, fc4 = st.columns(4)
+
+with fc1:
+    fob_all_in = st.number_input(
+        "FOB ALL IN USD",
+        value=float(base_foton.get("fob_all_in", 0)),
+        step=500.0,
+        disabled=not es_admin_costos,
+        key=f"foton_fob_{modelo_key_foton}"
+    )
+
+    ocean_freight = st.number_input(
+        "Ocean Freight USD",
+        value=float(base_foton.get("ocean_freight", 0)),
+        step=100.0,
+        disabled=not es_admin_costos,
+        key=f"foton_ocean_{modelo_key_foton}"
+    )
+
+with fc2:
+    costo_flete_extra = st.number_input(
+        "Costo Flete extra USD",
+        value=float(base_foton.get("costo_flete_extra", 0)),
+        step=100.0,
+        disabled=not es_admin_costos,
+        key=f"foton_flete_extra_{modelo_key_foton}"
+    )
+
+    insurance_customs_port = st.number_input(
+        "Insurance + Customs + Port + others USD",
+        value=float(base_foton.get("insurance_customs_port", 0)),
+        step=100.0,
+        disabled=not es_admin_costos,
+        key=f"foton_insurance_{modelo_key_foton}"
+    )
+
+with fc3:
+    traslado_extra = st.number_input(
+        "Traslado extra USD",
+        value=float(base_foton.get("traslado_extra", 0)),
+        step=100.0,
+        disabled=not es_admin_costos,
+        key=f"foton_traslado_{modelo_key_foton}"
+    )
+
+    gastos_pdi = st.number_input(
+        "Gastos PDI USD",
+        value=float(base_foton.get("gastos_pdi", 0)),
+        step=100.0,
+        disabled=not es_admin_costos,
+        key=f"foton_gastos_pdi_{modelo_key_foton}"
+    )
+
+with fc4:
+    mantencion_correctiva = st.number_input(
+        "Mantención correctiva USD",
+        value=float(base_foton.get("mantencion_correctiva", 0)),
+        step=100.0,
+        disabled=not es_admin_costos,
+        key=f"foton_mant_correctiva_{modelo_key_foton}"
+    )
+
+    repuestos_gratis = st.number_input(
+        "Repuestos gratis USD",
+        value=float(base_foton.get("repuestos_gratis", 0)),
+        step=100.0,
+        disabled=not es_admin_costos,
+        key=f"foton_repuestos_{modelo_key_foton}"
+    )
+
+        fc5, fc6, fc7, fc8 = st.columns(4)
+
+        with fc5:
+            adas_letreros = st.number_input(
+                "ADAS + Letreros + Próxima parada USD",
+                value=float(base_foton.get("adas_letreros", 0)),
+                step=100.0,
+                disabled=not es_admin_costos,
+                key=f"foton_adas_letreros_{modelo_key_foton}"
+            )
+
+            asesor = st.number_input(
+                "Asesor USD",
+                value=float(base_foton.get("asesor", 0)),
+                step=100.0,
+                disabled=not es_admin_costos,
+                key=f"foton_asesor_{modelo_key_foton}"
+            )
+
+        with fc6:
+            telemetria_anual = st.number_input(
+                "Telemetría USD/año",
+                value=float(base_foton.get("telemetria_anual", 180)),
+                step=10.0,
+                disabled=not es_admin_costos,
+                key=f"foton_telem_anual_{modelo_key_foton}"
+            )
+
+            anos_telem = st.number_input(
+                "Años telemetría",
+                value=int(base_foton.get("anos_telem", 1)),
+                min_value=0,
+                step=1,
+                disabled=not es_admin_costos,
+                key=f"foton_anos_telem_{modelo_key_foton}"
+            )
+
+        with fc7:
+            costo_apertura_pct = st.number_input(
+                "Costo apertura %",
+                value=float(base_foton.get("costo_apertura_pct", 1.60)),
+                step=0.1,
+                disabled=not es_admin_costos,
+                key=f"foton_apertura_pct_{modelo_key_foton}"
+            )
+
+            cm_free_anual = st.number_input(
+                "CM free USD/año",
+                value=float(base_foton.get("cm_free_anual", 3500)),
+                step=100.0,
+                disabled=not es_admin_costos,
+                key=f"foton_cm_free_{modelo_key_foton}"
+            )
+
+        with fc8:
+            anos_cm = st.number_input(
+                "Años CM free",
+                value=int(base_foton.get("anos_cm", 1)),
+                min_value=0,
+                step=1,
+                disabled=not es_admin_costos,
+                key=f"foton_anos_cm_{modelo_key_foton}"
+            )
+
+            capital_trabajo = st.number_input(
+                "Capital de trabajo USD",
+                value=float(base_foton.get("capital_trabajo", 0)),
+                step=100.0,
+                disabled=not es_admin_costos,
+                key=f"foton_capital_trabajo_{modelo_key_foton}"
+            )
+
+        garantia_bateria = float(base_foton.get("bateria_kwh", base_foton.get("bateria", 0))) * 17.56 * 0.30
+
+        cif = (
+            fob_all_in
+            + ocean_freight
+            + costo_flete_extra
+            + insurance_customs_port
+        )
+
+        telemetria_total = telemetria_anual * anos_telem
+        cm_free_total = cm_free_anual * anos_cm
+        costo_apertura = cif * (costo_apertura_pct / 100)
+
+        final_cost = (
+            cif
+            + garantia_bateria
+            + traslado_extra
+            + gastos_pdi
+            + mantencion_correctiva
+            + repuestos_gratis
+            + adas_letreros
+            + asesor
+            + telemetria_total
+            + costo_apertura
+            + cm_free_total
+            + capital_trabajo
+        )
+
+        fc_res1, fc_res2, fc_res3, fc_res4 = st.columns(4)
+        fc_res1.metric("CIF USD", fmt_usd(cif))
+        fc_res2.metric("Garantía batería USD", fmt_usd(garantia_bateria))
+        fc_res3.metric("Costo apertura USD", fmt_usd(costo_apertura))
+        fc_res4.metric("FINAL COST USD", fmt_usd(final_cost))
 
             st.markdown("""
             <div class="box-margen">
