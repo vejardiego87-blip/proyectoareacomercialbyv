@@ -1864,17 +1864,25 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             st.markdown("### Resumen comercial IVECO")
             st.dataframe(resumen, use_container_width=True, hide_index=True)
 
-        # =========================================================
+                # =========================================================
         # CALCULADORA FOTON
         # =========================================================
         if marca == "FOTON":
             f0, f1, f2 = st.columns([1.3, 2.4, 1])
 
             with f0:
-                clasificacion_foton = st.selectbox("Clasificación", list(FOTON_MODELOS.keys()), key="foton_clasificacion")
+                clasificacion_foton = st.selectbox(
+                    "Clasificación",
+                    list(FOTON_MODELOS.keys()),
+                    key="foton_clasificacion"
+                )
 
             with f1:
-                modelo_foton = st.selectbox("Modelo", list(FOTON_MODELOS[clasificacion_foton].keys()), key="foton_modelo")
+                modelo_foton = st.selectbox(
+                    "Modelo",
+                    list(FOTON_MODELOS[clasificacion_foton].keys()),
+                    key="foton_modelo"
+                )
 
             base_foton = FOTON_MODELOS[clasificacion_foton][modelo_foton]
             modelo_key_foton = limpiar_key(f"foton_{clasificacion_foton}_{modelo_foton}")
@@ -1888,12 +1896,211 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
 
             st.markdown("""
             <div class="box-costo">
-                <div class="titulo-box">2. Costo base FOTON</div>
-                <div class="sub-box">Costo final del modelo utilizado para calcular margen.</div>
+                <div class="titulo-box">2. Estructura de costo FOTON</div>
+                <div class="sub-box">Costo internacional, costos locales, garantía, telemetría, contrato de mantenimiento y capital de trabajo.</div>
             </div>
             """, unsafe_allow_html=True)
 
-            final_cost = st.number_input("Final Cost USD", value=float(base_foton["final_cost"]), step=500.0, disabled=not es_admin_costos, key=f"foton_final_cost_{modelo_key_foton}")
+            costo_disabled_foton = not es_admin_costos
+
+            fc1, fc2, fc3, fc4 = st.columns(4)
+
+            with fc1:
+                bateria_kwh = st.number_input(
+                    "Batería kWh",
+                    value=float(base_foton.get("bateria_kwh", base_foton.get("bateria", 0))),
+                    step=1.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_bateria_{modelo_key_foton}"
+                )
+
+                fob_all_in = st.number_input(
+                    "FOB ALL IN USD",
+                    value=float(base_foton.get("fob_all_in", 0)),
+                    step=500.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_fob_{modelo_key_foton}"
+                )
+
+                ocean_freight = st.number_input(
+                    "Ocean Freight USD",
+                    value=float(base_foton.get("ocean_freight", 0)),
+                    step=100.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_ocean_{modelo_key_foton}"
+                )
+
+            with fc2:
+                costo_flete_extra = st.number_input(
+                    "Costo Flete extra USD",
+                    value=float(base_foton.get("costo_flete_extra", 0)),
+                    step=100.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_flete_extra_{modelo_key_foton}"
+                )
+
+                insurance_customs_port = st.number_input(
+                    "Insurance + Customs + Port + others USD",
+                    value=float(base_foton.get("insurance_customs_port", 0)),
+                    step=100.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_insurance_{modelo_key_foton}"
+                )
+
+                traslado_extra = st.number_input(
+                    "Costo extra traslado USD",
+                    value=float(base_foton.get("traslado_extra", 0)),
+                    step=100.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_traslado_{modelo_key_foton}"
+                )
+
+            with fc3:
+                gastos_pdi = st.number_input(
+                    "Gastos PDI / kit seguridad USD",
+                    value=float(base_foton.get("gastos_pdi", 0)),
+                    step=100.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_gastos_pdi_{modelo_key_foton}"
+                )
+
+                mantencion_correctiva = st.number_input(
+                    "Mantención correctiva USD",
+                    value=float(base_foton.get("mantencion_correctiva", 0)),
+                    step=100.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_mant_correctiva_{modelo_key_foton}"
+                )
+
+                repuestos_gratis = st.number_input(
+                    "Repuestos gratis USD",
+                    value=float(base_foton.get("repuestos_gratis", 0)),
+                    step=100.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_repuestos_{modelo_key_foton}"
+                )
+
+            with fc4:
+                adas_letreros = st.number_input(
+                    "ADAS + Letreros + Próxima parada USD",
+                    value=float(base_foton.get("adas_letreros", 0)),
+                    step=100.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_adas_letreros_{modelo_key_foton}"
+                )
+
+                asesor = st.number_input(
+                    "Asesor USD",
+                    value=float(base_foton.get("asesor", 0)),
+                    step=100.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_asesor_{modelo_key_foton}"
+                )
+
+                capital_trabajo = st.number_input(
+                    "Capital de trabajo USD",
+                    value=float(base_foton.get("capital_trabajo", 0)),
+                    step=100.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_capital_trabajo_{modelo_key_foton}"
+                )
+
+            fc5, fc6, fc7, fc8 = st.columns(4)
+
+            with fc5:
+                valor_garantia_kwh = st.number_input(
+                    "Garantía USD/kWh",
+                    value=float(base_foton.get("valor_garantia_kwh", 17.56)),
+                    step=0.1,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_valor_garantia_kwh_{modelo_key_foton}"
+                )
+
+                garantia_pct = st.number_input(
+                    "Garantía %",
+                    value=float(base_foton.get("garantia_pct", 30.0)),
+                    step=1.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_garantia_pct_{modelo_key_foton}"
+                )
+
+            with fc6:
+                telemetria_anual = st.number_input(
+                    "Telemetría USD/año",
+                    value=float(base_foton.get("telemetria_anual", 180)),
+                    step=10.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_telem_anual_{modelo_key_foton}"
+                )
+
+                anos_telem = st.number_input(
+                    "Años telemetría",
+                    value=int(base_foton.get("anos_telem", 1)),
+                    min_value=0,
+                    step=1,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_anos_telem_{modelo_key_foton}"
+                )
+
+            with fc7:
+                costo_apertura_pct = st.number_input(
+                    "Costo apertura %",
+                    value=float(base_foton.get("costo_apertura_pct", 1.60)),
+                    step=0.1,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_apertura_pct_{modelo_key_foton}"
+                )
+
+                cm_free_anual = st.number_input(
+                    "CM free USD/año",
+                    value=float(base_foton.get("cm_free_anual", 3500)),
+                    step=100.0,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_cm_free_{modelo_key_foton}"
+                )
+
+            with fc8:
+                anos_cm = st.number_input(
+                    "Años CM free",
+                    value=int(base_foton.get("anos_cm", 1)),
+                    min_value=0,
+                    step=1,
+                    disabled=costo_disabled_foton,
+                    key=f"foton_anos_cm_{modelo_key_foton}"
+                )
+
+            cif = (
+                fob_all_in
+                + ocean_freight
+                + costo_flete_extra
+                + insurance_customs_port
+            )
+
+            garantia_bateria = bateria_kwh * valor_garantia_kwh * (garantia_pct / 100)
+            telemetria_total = telemetria_anual * anos_telem
+            cm_free_total = cm_free_anual * anos_cm
+            costo_apertura = cif * (costo_apertura_pct / 100)
+
+            final_cost = (
+                cif
+                + garantia_bateria
+                + traslado_extra
+                + gastos_pdi
+                + mantencion_correctiva
+                + repuestos_gratis
+                + adas_letreros
+                + asesor
+                + telemetria_total
+                + costo_apertura
+                + cm_free_total
+                + capital_trabajo
+            )
+
+            fc_res1, fc_res2, fc_res3, fc_res4 = st.columns(4)
+            fc_res1.metric("CIF USD", fmt_usd(cif))
+            fc_res2.metric("Garantía batería USD", fmt_usd(garantia_bateria))
+            fc_res3.metric("Costo apertura USD", fmt_usd(costo_apertura))
+            fc_res4.metric("FINAL COST USD", fmt_usd(final_cost))
 
             st.markdown("""
             <div class="box-margen">
@@ -1912,23 +2119,55 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
             iva_factor = 1.19
 
             if modo_precio == "Ingresar precio con IVA":
-                precio_con_iva = st.number_input("Precio venta con IVA USD", value=float(base_foton["precio_con_iva"]), step=500.0, disabled=not puede_simular, key=f"foton_precio_iva_{modelo_key_foton}")
+                precio_con_iva = st.number_input(
+                    "Precio venta con IVA USD",
+                    value=float(base_foton.get("precio_con_iva", final_cost * 1.25 * iva_factor)),
+                    step=500.0,
+                    disabled=not puede_simular,
+                    key=f"foton_precio_iva_{modelo_key_foton}"
+                )
                 precio_neto = precio_con_iva / iva_factor
 
             elif modo_precio == "Ingresar precio neto sin IVA":
-                precio_neto = st.number_input("Precio NETO USD sin IVA", value=float(base_foton["precio_con_iva"]) / iva_factor, step=500.0, disabled=not puede_simular, key=f"foton_precio_neto_{modelo_key_foton}")
+                precio_neto = st.number_input(
+                    "Precio NETO USD sin IVA",
+                    value=float(base_foton.get("precio_con_iva", final_cost * 1.25 * iva_factor)) / iva_factor,
+                    step=500.0,
+                    disabled=not puede_simular,
+                    key=f"foton_precio_neto_{modelo_key_foton}"
+                )
                 precio_con_iva = precio_neto * iva_factor
 
             else:
-                margen_objetivo_pct = st.number_input("Margen objetivo %", value=12.0, min_value=-50.0, max_value=80.0, step=0.5, disabled=not puede_simular, key=f"foton_margen_obj_{modelo_key_foton}")
-                precio_neto = final_cost / (1 - margen_objetivo_pct / 100) if margen_objetivo_pct < 100 else 0
+                margen_objetivo_pct = st.number_input(
+                    "Margen objetivo %",
+                    value=12.0,
+                    min_value=-50.0,
+                    max_value=80.0,
+                    step=0.5,
+                    disabled=not puede_simular,
+                    key=f"foton_margen_obj_{modelo_key_foton}"
+                )
+
+                precio_neto = (
+                    final_cost / (1 - margen_objetivo_pct / 100)
+                    if margen_objetivo_pct < 100 else 0
+                )
                 precio_con_iva = precio_neto * iva_factor
 
-            cantidad_foton = st.number_input("Cantidad unidades", value=1, min_value=1, step=1, disabled=not puede_simular, key=f"foton_cantidad_{modelo_key_foton}")
+            cantidad_foton = st.number_input(
+                "Cantidad unidades",
+                value=1,
+                min_value=1,
+                step=1,
+                disabled=not puede_simular,
+                key=f"foton_cantidad_{modelo_key_foton}"
+            )
 
             iva_usd = precio_con_iva - precio_neto
             margen_usd = precio_neto - final_cost
             margen_pct = margen_usd / precio_neto * 100 if precio_neto > 0 else 0
+
             ingreso_total_neto = precio_neto * cantidad_foton
             ingreso_total_iva = precio_con_iva * cantidad_foton
             costo_total_foton = final_cost * cantidad_foton
@@ -1976,16 +2215,44 @@ if st.session_state.usuario in {"rsepulveda", "forellana", "dvejar"}:
 
             with st.expander("🧠 Ver lógica de cálculo FOTON"):
                 st.markdown("""
-                1. **Final Cost USD** = costo final del modelo.  
-                2. **Precio NETO USD** = Precio con IVA / 1,19.  
-                3. **IVA USD** = Precio con IVA - Precio neto.  
-                4. **Margen USD** = Precio neto - Final Cost.  
-                5. **Margen %** = Margen USD / Precio neto.  
+                1. **CIF** = FOB ALL IN + Ocean Freight + Flete extra + Insurance/Customs/Port.  
+                2. **Garantía batería** = kWh batería × USD/kWh garantía × % garantía.  
+                3. **Costo apertura** = CIF × % apertura.  
+                4. **FINAL COST** = CIF + garantía + costos locales + telemetría + CM free + capital de trabajo.  
+                5. **Precio NETO USD** = Precio con IVA / 1,19.  
+                6. **Margen USD** = Precio neto - FINAL COST.  
+                7. **Margen %** = Margen USD / Precio neto.  
                 """)
 
             resumen_foton = pd.DataFrame({
-                "Concepto": ["Marca", "Clasificación", "Modelo", "Batería", "Dólar BCCh", "Final Cost USD", "Precio NETO USD", "IVA USD", "Precio con IVA USD", "Precio con IVA CLP", "Margen USD unidad", "Margen %", "Cantidad unidades", "Ingreso total neto USD", "Ingreso total c/IVA USD", "Costo total USD", "Margen total USD"],
-                "Valor": ["FOTON", clasificacion_foton, modelo_foton, base_foton["bateria"], fmt_clp_dec(dolar_usado), fmt_usd(final_cost), fmt_usd(precio_neto), fmt_usd(iva_usd), fmt_usd(precio_con_iva), fmt_clp(precio_con_iva * dolar_usado), fmt_usd(margen_usd), f"{margen_pct:.1f}%", cantidad_foton, fmt_usd(ingreso_total_neto), fmt_usd(ingreso_total_iva), fmt_usd(costo_total_foton), fmt_usd(margen_total_foton)]
+                "Concepto": [
+                    "Marca", "Clasificación", "Modelo", "Batería kWh", "Dólar BCCh",
+                    "FOB ALL IN USD", "Ocean Freight USD", "Costo Flete extra USD",
+                    "Insurance + Customs + Port USD", "CIF USD",
+                    "Garantía batería USD", "Traslado extra USD", "Gastos PDI USD",
+                    "Mantención correctiva USD", "Repuestos gratis USD",
+                    "ADAS + Letreros USD", "Asesor USD", "Telemetría total USD",
+                    "Costo apertura USD", "CM free total USD", "Capital trabajo USD",
+                    "FINAL COST USD", "Precio NETO USD", "IVA USD",
+                    "Precio con IVA USD", "Precio con IVA CLP",
+                    "Margen USD unidad", "Margen %", "Cantidad unidades",
+                    "Ingreso total neto USD", "Ingreso total c/IVA USD",
+                    "Costo total USD", "Margen total USD"
+                ],
+                "Valor": [
+                    "FOTON", clasificacion_foton, modelo_foton, bateria_kwh, fmt_clp_dec(dolar_usado),
+                    fmt_usd(fob_all_in), fmt_usd(ocean_freight), fmt_usd(costo_flete_extra),
+                    fmt_usd(insurance_customs_port), fmt_usd(cif),
+                    fmt_usd(garantia_bateria), fmt_usd(traslado_extra), fmt_usd(gastos_pdi),
+                    fmt_usd(mantencion_correctiva), fmt_usd(repuestos_gratis),
+                    fmt_usd(adas_letreros), fmt_usd(asesor), fmt_usd(telemetria_total),
+                    fmt_usd(costo_apertura), fmt_usd(cm_free_total), fmt_usd(capital_trabajo),
+                    fmt_usd(final_cost), fmt_usd(precio_neto), fmt_usd(iva_usd),
+                    fmt_usd(precio_con_iva), fmt_clp(precio_con_iva * dolar_usado),
+                    fmt_usd(margen_usd), f"{margen_pct:.1f}%", cantidad_foton,
+                    fmt_usd(ingreso_total_neto), fmt_usd(ingreso_total_iva),
+                    fmt_usd(costo_total_foton), fmt_usd(margen_total_foton)
+                ]
             })
 
             st.markdown("### Resumen comercial FOTON")
