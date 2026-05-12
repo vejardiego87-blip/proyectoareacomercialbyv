@@ -1507,54 +1507,11 @@ with tab_dash:
             ).properties(height=350)
             st.altair_chart(graf_scatter, use_container_width=True)
 
-            st.markdown("### Cotizaciones por vendedor y modelo")
-
-            df_vm = df_dash.copy()
-
-            df_vm["cotizante"] = df_vm["cotizante"].fillna("Sin vendedor")
-            df_vm["modelo"] = df_vm["modelo"].fillna("Sin modelo")
-
-            resumen_vm = (
-                df_vm.groupby(["cotizante", "modelo"])
-                .agg(
-                    cantidad_cotizaciones=("numero_cotizacion", "count"),
-                    total_unidades=("cantidad_unidades", "sum"),
-                    total_negocio=("total_negocio", "sum")
-                )
-                .reset_index()
-            )
-
-            graf_vendedor_modelo = alt.Chart(resumen_vm).mark_bar().encode(
-                x=alt.X(
-                    "cotizante:N",
-                    title="Vendedor",
-                    sort="-y"
-                ),
-                y=alt.Y(
-                    "cantidad_cotizaciones:Q",
-                    title="Cantidad de cotizaciones"
-                ),
-                color=alt.Color(
-                    "modelo:N",
-                    title="Modelo"
-                ),
-                tooltip=[
-                    alt.Tooltip("cotizante:N", title="Vendedor"),
-                    alt.Tooltip("modelo:N", title="Modelo"),
-                    alt.Tooltip("cantidad_cotizaciones:Q", title="Cotizaciones"),
-                    alt.Tooltip("total_unidades:Q", title="Unidades"),
-                    alt.Tooltip("total_negocio:Q", title="Total negocio USD", format=",.0f"),
-                ]
-            ).properties(height=380)
-
-            st.altair_chart(graf_vendedor_modelo, use_container_width=True)
-
-            st.markdown("### Resumen por vendedor y modelo")
-
-            resumen_vm_v = resumen_vm.copy()
-            resumen_vm_v["total_negocio"] = resumen_vm_v["total_negocio"].apply(usd_fmt)
-
-            st.dataframe(resumen_vm_v, use_container_width=True, hide_index=True)
+            st.markdown("### Detalle")
+            df_v = df_dash.copy()
+            df_v["precio_unitario"] = df_v["precio_unitario"].apply(usd_fmt)
+            df_v["total_negocio"] = df_v["total_negocio"].apply(usd_fmt)
+            st.dataframe(df_v, use_container_width=True)
 
     except Exception as e:
         st.error(f"Error dashboard: {e}")
