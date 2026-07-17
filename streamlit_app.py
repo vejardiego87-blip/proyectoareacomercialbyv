@@ -1844,8 +1844,7 @@ with tab_dash:
                 )
 
     except Exception as e:
-        st.error(f"Error en dashboard ejecutivo: {e}")
-        
+        st.error(f"Error en dashboard ejecutivo: {e}")        
 # =========================================================
 # TAB 5 - CALCULADORA COMERCIAL MULTIMARCA
 # =========================================================
