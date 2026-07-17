@@ -1457,32 +1457,35 @@ with tab_efi:
         except Exception as e:
             st.error(f"Error: {e}")
 # =========================================================
-# TAB 4 - DASHBOARD COMERCIAL EJECUTIVO
-# Reemplaza el bloque actual "with tab_dash:"
+# TAB 4 - DASHBOARD COMERCIAL
+# Reemplaza únicamente el bloque actual de TAB 4 por este.
+# No modifiques TAB 1, TAB 2, TAB 3, TAB 5 ni secrets.toml.
 # =========================================================
 with tab_dash:
-    st.subheader("📊 Dashboard Comercial Ejecutivo")
+    st.subheader("📊 Dashboard Comercial")
     st.caption(
-        "Seguimiento de actividad comercial y monto potencial cotizado. "
-        "Los valores no representan ventas cerradas."
+        "Seguimiento de cotizaciones y oportunidades comerciales. "
+        "Los montos corresponden a propuestas emitidas y no necesariamente a ventas cerradas."
     )
 
-    def convertir_usd_numero(valor):
-        """Convierte números o textos como 'USD 130.491' a float."""
+    def convertir_numero_dashboard(valor):
+        """
+        Convierte valores numéricos o textos como:
+        130491 | 130.491 | USD 130.491 | 130.491,50
+        """
         if pd.isna(valor):
             return 0.0
+
         if isinstance(valor, (int, float)):
             return float(valor)
 
-        texto = str(valor).upper().replace("USD", "").strip()
+        texto = str(valor).upper().replace("USD", "").replace("CLP", "").strip()
         texto = texto.replace(" ", "")
 
-        # Formato chileno: 130.491 o 130.491,50
         if "." in texto and "," in texto:
             texto = texto.replace(".", "").replace(",", ".")
         elif "." in texto:
             partes = texto.split(".")
-            # Si la parte final tiene 3 dígitos, se interpreta como separador de miles.
             if len(partes[-1]) == 3:
                 texto = "".join(partes)
         elif "," in texto:
@@ -1493,358 +1496,503 @@ with tab_dash:
         except Exception:
             return 0.0
 
-    def formato_usd(valor):
-        return f"USD {valor:,.0f}".replace(",", ".")
+    def formato_usd_dashboard(valor):
+        try:
+            return f"USD {float(valor):,.0f}".replace(",", ".")
+        except Exception:
+            return "USD 0"
 
     try:
         df_dash = cargar_historial()
 
         if df_dash.empty:
-            st.info("No hay cotizaciones registradas.")
+            st.info("Aún no existen cotizaciones registradas.")
+
         else:
             df_dash = df_dash.copy()
 
             # ---------------------------------------------------------
             # LIMPIEZA DE DATOS
             # ---------------------------------------------------------
-            df_dash["total_negocio"] = df_dash["total_negocio"].apply(convertir_usd_numero)
-            df_dash["precio_unitario"] = df_dash["precio_unitario"].apply(convertir_usd_numero)
+            df_dash["total_negocio"] = df_dash["total_negocio"].apply(
+                convertir_numero_dashboard
+            )
+            df_dash["precio_unitario"] = df_dash["precio_unitario"].apply(
+                convertir_numero_dashboard
+            )
             df_dash["cantidad_unidades"] = pd.to_numeric(
                 df_dash["cantidad_unidades"], errors="coerce"
             ).fillna(0)
 
-            df_dash["fecha_dt"] = pd.to_datetime(df_dash["fecha"], errors="coerce")
+            df_dash["fecha_dt"] = pd.to_datetime(
+                df_dash["fecha"], errors="coerce"
+            )
+
+            df_dash["cliente"] = (
+                df_dash["cliente"]
+                .fillna("Sin cliente")
+                .astype(str)
+                .str.strip()
+            )
+            df_dash["cotizante"] = (
+                df_dash["cotizante"]
+                .fillna("Sin vendedor")
+                .astype(str)
+                .str.strip()
+            )
+            df_dash["modelo"] = (
+                df_dash["modelo"]
+                .fillna("Sin modelo")
+                .astype(str)
+                .str.strip()
+            )
+
             df_dash = df_dash.dropna(subset=["fecha_dt"])
 
-            df_dash["cliente"] = df_dash["cliente"].fillna("Sin cliente").astype(str).str.strip()
-            df_dash["cotizante"] = df_dash["cotizante"].fillna("Sin vendedor").astype(str).str.strip()
-            df_dash["modelo"] = df_dash["modelo"].fillna("Sin modelo").astype(str).str.strip()
+            if df_dash.empty:
+                st.warning("No existen fechas válidas para construir el dashboard.")
 
-            # ---------------------------------------------------------
-            # FILTROS
-            # ---------------------------------------------------------
-            st.markdown("#### Filtros")
-
-            fecha_min = df_dash["fecha_dt"].min().date()
-            fecha_max = df_dash["fecha_dt"].max().date()
-
-            f1, f2, f3 = st.columns([1.4, 1.3, 1.3])
-
-            with f1:
-                rango_fecha = st.date_input(
-                    "Periodo",
-                    value=(fecha_min, fecha_max),
-                    min_value=fecha_min,
-                    max_value=fecha_max,
-                    key="dash_rango_fecha"
-                )
-
-            with f2:
-                vendedores = st.multiselect(
-                    "Vendedor",
-                    options=sorted(df_dash["cotizante"].unique()),
-                    default=sorted(df_dash["cotizante"].unique()),
-                    key="dash_vendedores"
-                )
-
-            with f3:
-                modelos = st.multiselect(
-                    "Modelo",
-                    options=sorted(df_dash["modelo"].unique()),
-                    default=sorted(df_dash["modelo"].unique()),
-                    key="dash_modelos"
-                )
-
-            if isinstance(rango_fecha, tuple) and len(rango_fecha) == 2:
-                fecha_desde, fecha_hasta = rango_fecha
             else:
-                fecha_desde = fecha_hasta = rango_fecha
+                # -----------------------------------------------------
+                # FILTROS
+                # -----------------------------------------------------
+                st.markdown("### Filtros")
 
-            df_filtrado = df_dash[
-                (df_dash["fecha_dt"].dt.date >= fecha_desde) &
-                (df_dash["fecha_dt"].dt.date <= fecha_hasta) &
-                (df_dash["cotizante"].isin(vendedores)) &
-                (df_dash["modelo"].isin(modelos))
-            ].copy()
+                fecha_min = df_dash["fecha_dt"].min().date()
+                fecha_max = df_dash["fecha_dt"].max().date()
 
-            if df_filtrado.empty:
-                st.warning("No existen registros para los filtros seleccionados.")
-                st.stop()
+                f1, f2, f3 = st.columns([1.4, 1.3, 1.3])
 
-            # ---------------------------------------------------------
-            # KPI EJECUTIVOS
-            # ---------------------------------------------------------
-            total_cotizaciones = len(df_filtrado)
-            total_unidades = int(df_filtrado["cantidad_unidades"].sum())
-            clientes_unicos = int(df_filtrado["cliente"].nunique())
-            monto_potencial = float(df_filtrado["total_negocio"].sum())
-            ticket_promedio = float(df_filtrado["total_negocio"].mean())
+                with f1:
+                    rango_fecha = st.date_input(
+                        "Periodo",
+                        value=(fecha_min, fecha_max),
+                        min_value=fecha_min,
+                        max_value=fecha_max,
+                        key="dashboard_periodo"
+                    )
 
-            k1, k2, k3, k4, k5 = st.columns(5)
-            k1.metric("Cotizaciones", f"{total_cotizaciones}")
-            k2.metric("Unidades cotizadas", f"{total_unidades}")
-            k3.metric("Clientes", f"{clientes_unicos}")
-            k4.metric("Monto potencial", formato_usd(monto_potencial))
-            k5.metric("Ticket promedio", formato_usd(ticket_promedio))
+                with f2:
+                    opciones_vendedores = sorted(
+                        df_dash["cotizante"].dropna().unique().tolist()
+                    )
+                    vendedores_sel = st.multiselect(
+                        "Vendedor",
+                        options=opciones_vendedores,
+                        default=opciones_vendedores,
+                        key="dashboard_vendedores"
+                    )
 
-            st.info(
-                "Los indicadores muestran actividad y oportunidad comercial. "
-                "Para medir ventas reales se debe incorporar el estado de cada cotización."
-            )
+                with f3:
+                    opciones_modelos = sorted(
+                        df_dash["modelo"].dropna().unique().tolist()
+                    )
+                    modelos_sel = st.multiselect(
+                        "Modelo",
+                        options=opciones_modelos,
+                        default=opciones_modelos,
+                        key="dashboard_modelos"
+                    )
 
-            # ---------------------------------------------------------
-            # LECTURA EJECUTIVA
-            # ---------------------------------------------------------
-            resumen_modelo = (
-                df_filtrado.groupby("modelo", as_index=False)
-                .agg(
-                    cotizaciones=("numero_cotizacion", "count"),
-                    unidades=("cantidad_unidades", "sum"),
-                    monto=("total_negocio", "sum")
-                )
-                .sort_values("monto", ascending=False)
-            )
+                if isinstance(rango_fecha, tuple) and len(rango_fecha) == 2:
+                    fecha_desde, fecha_hasta = rango_fecha
+                else:
+                    fecha_desde = fecha_hasta = rango_fecha
 
-            resumen_vendedor = (
-                df_filtrado.groupby("cotizante", as_index=False)
-                .agg(
-                    cotizaciones=("numero_cotizacion", "count"),
-                    unidades=("cantidad_unidades", "sum"),
-                    clientes=("cliente", "nunique"),
-                    monto=("total_negocio", "sum")
-                )
-                .sort_values("monto", ascending=False)
-            )
+                df_filtrado = df_dash[
+                    (df_dash["fecha_dt"].dt.date >= fecha_desde) &
+                    (df_dash["fecha_dt"].dt.date <= fecha_hasta) &
+                    (df_dash["cotizante"].isin(vendedores_sel)) &
+                    (df_dash["modelo"].isin(modelos_sel))
+                ].copy()
 
-            resumen_cliente = (
-                df_filtrado.groupby("cliente", as_index=False)
-                .agg(
-                    cotizaciones=("numero_cotizacion", "count"),
-                    unidades=("cantidad_unidades", "sum"),
-                    monto=("total_negocio", "sum")
-                )
-                .sort_values("monto", ascending=False)
-            )
+                if df_filtrado.empty:
+                    st.warning("No existen registros para los filtros seleccionados.")
 
-            modelo_lider = resumen_modelo.iloc[0]
-            vendedor_lider = resumen_vendedor.iloc[0]
-            cliente_lider = resumen_cliente.iloc[0]
+                else:
+                    # -------------------------------------------------
+                    # KPI EJECUTIVOS
+                    # -------------------------------------------------
+                    total_cotizaciones = len(df_filtrado)
+                    total_unidades = int(
+                        df_filtrado["cantidad_unidades"].sum()
+                    )
+                    total_clientes = int(
+                        df_filtrado["cliente"].nunique()
+                    )
+                    monto_potencial = float(
+                        df_filtrado["total_negocio"].sum()
+                    )
+                    ticket_promedio = float(
+                        df_filtrado["total_negocio"].mean()
+                    )
 
-            participacion_modelo = (
-                modelo_lider["monto"] / monto_potencial * 100
-                if monto_potencial > 0 else 0
-            )
-            participacion_vendedor = (
-                vendedor_lider["monto"] / monto_potencial * 100
-                if monto_potencial > 0 else 0
-            )
-            participacion_cliente = (
-                cliente_lider["monto"] / monto_potencial * 100
-                if monto_potencial > 0 else 0
-            )
+                    k1, k2, k3, k4, k5 = st.columns(5)
 
-            st.markdown("#### Lectura ejecutiva")
-            l1, l2, l3 = st.columns(3)
+                    k1.metric(
+                        "Cotizaciones",
+                        f"{total_cotizaciones:,}".replace(",", ".")
+                    )
+                    k2.metric(
+                        "Unidades cotizadas",
+                        f"{total_unidades:,}".replace(",", ".")
+                    )
+                    k3.metric(
+                        "Clientes gestionados",
+                        f"{total_clientes:,}".replace(",", ".")
+                    )
+                    k4.metric(
+                        "Monto potencial",
+                        formato_usd_dashboard(monto_potencial)
+                    )
+                    k5.metric(
+                        "Ticket promedio",
+                        formato_usd_dashboard(ticket_promedio)
+                    )
 
-            with l1:
-                st.markdown(
-                    f"""
-                    **Modelo con mayor monto potencial**  
-                    {modelo_lider['modelo']}  
-                    {participacion_modelo:.1f}% del monto cotizado
-                    """
-                )
+                    st.info(
+                        "El monto potencial representa el valor total de las "
+                        "cotizaciones emitidas. No corresponde necesariamente "
+                        "a ventas adjudicadas."
+                    )
 
-            with l2:
-                st.markdown(
-                    f"""
-                    **Vendedor con mayor monto potencial**  
-                    {vendedor_lider['cotizante']}  
-                    {participacion_vendedor:.1f}% del monto cotizado
-                    """
-                )
+                    # -------------------------------------------------
+                    # EVOLUCIÓN MENSUAL
+                    # -------------------------------------------------
+                    df_filtrado["mes"] = (
+                        df_filtrado["fecha_dt"]
+                        .dt.to_period("M")
+                        .dt.to_timestamp()
+                    )
 
-            with l3:
-                st.markdown(
-                    f"""
-                    **Mayor concentración por cliente**  
-                    {cliente_lider['cliente']}  
-                    {participacion_cliente:.1f}% del monto cotizado
-                    """
-                )
+                    resumen_mensual = (
+                        df_filtrado.groupby("mes", as_index=False)
+                        .agg(
+                            cotizaciones=("numero_cotizacion", "count"),
+                            unidades=("cantidad_unidades", "sum"),
+                            monto_potencial=("total_negocio", "sum")
+                        )
+                        .sort_values("mes")
+                    )
 
-            # ---------------------------------------------------------
-            # EVOLUCIÓN MENSUAL
-            # ---------------------------------------------------------
-            df_filtrado["mes"] = df_filtrado["fecha_dt"].dt.to_period("M").dt.to_timestamp()
+                    st.markdown("### Evolución de la actividad comercial")
 
-            resumen_mes = (
-                df_filtrado.groupby("mes", as_index=False)
-                .agg(
-                    cotizaciones=("numero_cotizacion", "count"),
-                    unidades=("cantidad_unidades", "sum"),
-                    monto=("total_negocio", "sum")
-                )
-            )
+                    g1, g2 = st.columns(2)
 
-            st.markdown("#### Evolución mensual")
+                    with g1:
+                        graf_monto_mes = (
+                            alt.Chart(resumen_mensual)
+                            .mark_bar(
+                                cornerRadiusTopLeft=4,
+                                cornerRadiusTopRight=4
+                            )
+                            .encode(
+                                x=alt.X(
+                                    "mes:T",
+                                    title="Mes",
+                                    axis=alt.Axis(format="%b %Y")
+                                ),
+                                y=alt.Y(
+                                    "monto_potencial:Q",
+                                    title="Monto potencial (USD)"
+                                ),
+                                tooltip=[
+                                    alt.Tooltip(
+                                        "mes:T",
+                                        title="Mes",
+                                        format="%B %Y"
+                                    ),
+                                    alt.Tooltip(
+                                        "monto_potencial:Q",
+                                        title="Monto potencial",
+                                        format=",.0f"
+                                    ),
+                                    alt.Tooltip(
+                                        "cotizaciones:Q",
+                                        title="Cotizaciones"
+                                    ),
+                                    alt.Tooltip(
+                                        "unidades:Q",
+                                        title="Unidades"
+                                    ),
+                                ]
+                            )
+                            .properties(
+                                title="Monto potencial cotizado por mes",
+                                height=330
+                            )
+                        )
 
-            g1, g2 = st.columns(2)
+                        st.altair_chart(
+                            graf_monto_mes,
+                            use_container_width=True
+                        )
 
-            with g1:
-                graf_monto_mes = alt.Chart(resumen_mes).mark_bar(
-                    cornerRadiusTopLeft=4,
-                    cornerRadiusTopRight=4
-                ).encode(
-                    x=alt.X("mes:T", title="Mes", axis=alt.Axis(format="%b %Y")),
-                    y=alt.Y("monto:Q", title="Monto potencial (USD)"),
-                    tooltip=[
-                        alt.Tooltip("mes:T", title="Mes", format="%B %Y"),
-                        alt.Tooltip("monto:Q", title="Monto potencial", format=",.0f"),
-                        alt.Tooltip("cotizaciones:Q", title="Cotizaciones"),
-                        alt.Tooltip("unidades:Q", title="Unidades"),
-                    ]
-                ).properties(
-                    title="Monto potencial cotizado por mes",
-                    height=330
-                )
-                st.altair_chart(graf_monto_mes, use_container_width=True)
+                    with g2:
+                        graf_cotizaciones_mes = (
+                            alt.Chart(resumen_mensual)
+                            .mark_line(point=True, strokeWidth=3)
+                            .encode(
+                                x=alt.X(
+                                    "mes:T",
+                                    title="Mes",
+                                    axis=alt.Axis(format="%b %Y")
+                                ),
+                                y=alt.Y(
+                                    "cotizaciones:Q",
+                                    title="Cantidad de cotizaciones"
+                                ),
+                                tooltip=[
+                                    alt.Tooltip(
+                                        "mes:T",
+                                        title="Mes",
+                                        format="%B %Y"
+                                    ),
+                                    alt.Tooltip(
+                                        "cotizaciones:Q",
+                                        title="Cotizaciones"
+                                    ),
+                                    alt.Tooltip(
+                                        "unidades:Q",
+                                        title="Unidades"
+                                    ),
+                                ]
+                            )
+                            .properties(
+                                title="Cotizaciones generadas por mes",
+                                height=330
+                            )
+                        )
 
-            with g2:
-                graf_cot_mes = alt.Chart(resumen_mes).mark_line(
-                    point=True,
-                    strokeWidth=3
-                ).encode(
-                    x=alt.X("mes:T", title="Mes", axis=alt.Axis(format="%b %Y")),
-                    y=alt.Y("cotizaciones:Q", title="Cantidad de cotizaciones"),
-                    tooltip=[
-                        alt.Tooltip("mes:T", title="Mes", format="%B %Y"),
-                        alt.Tooltip("cotizaciones:Q", title="Cotizaciones"),
-                        alt.Tooltip("unidades:Q", title="Unidades"),
-                    ]
-                ).properties(
-                    title="Actividad comercial mensual",
-                    height=330
-                )
-                st.altair_chart(graf_cot_mes, use_container_width=True)
+                        st.altair_chart(
+                            graf_cotizaciones_mes,
+                            use_container_width=True
+                        )
 
-            # ---------------------------------------------------------
-            # MIX DE MODELOS Y DESEMPEÑO POR VENDEDOR
-            # ---------------------------------------------------------
-            st.markdown("#### Composición comercial")
+                    # -------------------------------------------------
+                    # PARTICIPACIÓN POR MODELO Y VENDEDOR
+                    # -------------------------------------------------
+                    resumen_modelos = (
+                        df_filtrado.groupby("modelo", as_index=False)
+                        .agg(
+                            cotizaciones=("numero_cotizacion", "count"),
+                            unidades=("cantidad_unidades", "sum"),
+                            monto_potencial=("total_negocio", "sum"),
+                            precio_promedio=("precio_unitario", "mean")
+                        )
+                        .sort_values(
+                            "monto_potencial",
+                            ascending=False
+                        )
+                    )
 
-            g3, g4 = st.columns(2)
+                    resumen_vendedores = (
+                        df_filtrado.groupby("cotizante", as_index=False)
+                        .agg(
+                            cotizaciones=("numero_cotizacion", "count"),
+                            clientes=("cliente", "nunique"),
+                            unidades=("cantidad_unidades", "sum"),
+                            monto_potencial=("total_negocio", "sum")
+                        )
+                        .sort_values(
+                            "monto_potencial",
+                            ascending=False
+                        )
+                    )
 
-            with g3:
-                graf_modelo = alt.Chart(resumen_modelo).mark_arc(
-                    innerRadius=70,
-                    outerRadius=120
-                ).encode(
-                    theta=alt.Theta("monto:Q"),
-                    color=alt.Color("modelo:N", title="Modelo"),
-                    tooltip=[
-                        alt.Tooltip("modelo:N", title="Modelo"),
-                        alt.Tooltip("cotizaciones:Q", title="Cotizaciones"),
-                        alt.Tooltip("unidades:Q", title="Unidades"),
-                        alt.Tooltip("monto:Q", title="Monto potencial", format=",.0f"),
-                    ]
-                ).properties(
-                    title="Participación por modelo",
-                    height=350
-                )
-                st.altair_chart(graf_modelo, use_container_width=True)
+                    st.markdown("### Composición comercial")
 
-            with g4:
-                graf_vendedor = alt.Chart(resumen_vendedor).mark_bar(
-                    cornerRadiusEnd=4
-                ).encode(
-                    y=alt.Y(
-                        "cotizante:N",
-                        title="Vendedor",
-                        sort=alt.SortField(field="monto", order="descending")
-                    ),
-                    x=alt.X("monto:Q", title="Monto potencial (USD)"),
-                    tooltip=[
-                        alt.Tooltip("cotizante:N", title="Vendedor"),
-                        alt.Tooltip("cotizaciones:Q", title="Cotizaciones"),
-                        alt.Tooltip("clientes:Q", title="Clientes"),
-                        alt.Tooltip("unidades:Q", title="Unidades"),
-                        alt.Tooltip("monto:Q", title="Monto potencial", format=",.0f"),
-                    ]
-                ).properties(
-                    title="Monto potencial por vendedor",
-                    height=350
-                )
-                st.altair_chart(graf_vendedor, use_container_width=True)
+                    g3, g4 = st.columns(2)
 
-            # ---------------------------------------------------------
-            # PRINCIPALES OPORTUNIDADES
-            # ---------------------------------------------------------
-            st.markdown("#### Principales oportunidades por cliente")
+                    with g3:
+                        graf_modelos = (
+                            alt.Chart(resumen_modelos)
+                            .mark_arc(innerRadius=70)
+                            .encode(
+                                theta=alt.Theta(
+                                    "monto_potencial:Q",
+                                    title="Monto potencial"
+                                ),
+                                color=alt.Color(
+                                    "modelo:N",
+                                    title="Modelo"
+                                ),
+                                tooltip=[
+                                    alt.Tooltip(
+                                        "modelo:N",
+                                        title="Modelo"
+                                    ),
+                                    alt.Tooltip(
+                                        "cotizaciones:Q",
+                                        title="Cotizaciones"
+                                    ),
+                                    alt.Tooltip(
+                                        "unidades:Q",
+                                        title="Unidades"
+                                    ),
+                                    alt.Tooltip(
+                                        "monto_potencial:Q",
+                                        title="Monto potencial",
+                                        format=",.0f"
+                                    ),
+                                    alt.Tooltip(
+                                        "precio_promedio:Q",
+                                        title="Precio promedio",
+                                        format=",.0f"
+                                    ),
+                                ]
+                            )
+                            .properties(
+                                title="Participación del monto por modelo",
+                                height=350
+                            )
+                        )
 
-            tabla_clientes = resumen_cliente.head(10).copy()
-            tabla_clientes["monto"] = tabla_clientes["monto"].apply(formato_usd)
-            tabla_clientes = tabla_clientes.rename(columns={
-                "cliente": "Cliente",
-                "cotizaciones": "Cotizaciones",
-                "unidades": "Unidades",
-                "monto": "Monto potencial"
-            })
+                        st.altair_chart(
+                            graf_modelos,
+                            use_container_width=True
+                        )
 
-            st.dataframe(
-                tabla_clientes,
-                use_container_width=True,
-                hide_index=True
-            )
+                    with g4:
+                        graf_vendedores = (
+                            alt.Chart(resumen_vendedores)
+                            .mark_bar(cornerRadiusEnd=4)
+                            .encode(
+                                y=alt.Y(
+                                    "cotizante:N",
+                                    title="Vendedor",
+                                    sort=alt.SortField(
+                                        field="monto_potencial",
+                                        order="descending"
+                                    )
+                                ),
+                                x=alt.X(
+                                    "monto_potencial:Q",
+                                    title="Monto potencial (USD)"
+                                ),
+                                tooltip=[
+                                    alt.Tooltip(
+                                        "cotizante:N",
+                                        title="Vendedor"
+                                    ),
+                                    alt.Tooltip(
+                                        "cotizaciones:Q",
+                                        title="Cotizaciones"
+                                    ),
+                                    alt.Tooltip(
+                                        "clientes:Q",
+                                        title="Clientes"
+                                    ),
+                                    alt.Tooltip(
+                                        "unidades:Q",
+                                        title="Unidades"
+                                    ),
+                                    alt.Tooltip(
+                                        "monto_potencial:Q",
+                                        title="Monto potencial",
+                                        format=",.0f"
+                                    ),
+                                ]
+                            )
+                            .properties(
+                                title="Monto potencial por vendedor",
+                                height=350
+                            )
+                        )
 
-            # ---------------------------------------------------------
-            # AVANCE DE LA INICIATIVA
-            # ---------------------------------------------------------
-            st.markdown("#### Estado de la iniciativa")
+                        st.altair_chart(
+                            graf_vendedores,
+                            use_container_width=True
+                        )
 
-            estado_iniciativa = pd.DataFrame([
-                ["Cotización automática Word/PDF", "Implementado"],
-                ["Historial y correlativos", "Implementado"],
-                ["Dashboard comercial", "Implementado"],
-                ["Análisis de eficiencia energética", "Implementado"],
-                ["Calculadora de estructura de costo", "Implementado"],
-                ["Estado y embudo de cotizaciones", "Pendiente"],
-                ["Tasa de conversión y motivos de pérdida", "Pendiente"],
-                ["Medición de tiempo ahorrado", "Pendiente"],
-            ], columns=["Componente", "Estado"])
+                    # -------------------------------------------------
+                    # PRINCIPALES CLIENTES
+                    # -------------------------------------------------
+                    resumen_clientes = (
+                        df_filtrado.groupby("cliente", as_index=False)
+                        .agg(
+                            cotizaciones=("numero_cotizacion", "count"),
+                            unidades=("cantidad_unidades", "sum"),
+                            monto_potencial=("total_negocio", "sum")
+                        )
+                        .sort_values(
+                            "monto_potencial",
+                            ascending=False
+                        )
+                    )
 
-            st.dataframe(
-                estado_iniciativa,
-                use_container_width=True,
-                hide_index=True
-            )
+                    st.markdown("### Principales clientes")
 
-            p1, p2 = st.columns(2)
+                    top_clientes = resumen_clientes.head(10).copy()
+                    top_clientes["monto_potencial"] = top_clientes[
+                        "monto_potencial"
+                    ].apply(formato_usd_dashboard)
 
-            with p1:
-                st.markdown(
-                    """
-                    **Próximos pasos**
-                    - Incorporar estado: enviada, seguimiento, adjudicada, perdida y anulada.
-                    - Medir tasa de conversión por vendedor, modelo y cliente.
-                    - Agregar margen, probabilidad y fecha estimada de cierre.
-                    - Implementar alertas de seguimiento comercial.
-                    """
-                )
+                    top_clientes = top_clientes.rename(columns={
+                        "cliente": "Cliente",
+                        "cotizaciones": "Cotizaciones",
+                        "unidades": "Unidades cotizadas",
+                        "monto_potencial": "Monto potencial"
+                    })
 
-            with p2:
-                st.markdown(
-                    """
-                    **Necesidades para continuar**
-                    - Definir responsables y reglas del proceso comercial.
-                    - Establecer una línea base del tiempo manual de cotización.
-                    - Evitar reutilizar correlativos eliminados; registrar anulaciones.
-                    - Estandarizar nombres de clientes y calidad de los datos.
-                    """
-                )
+                    st.dataframe(
+                        top_clientes,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    # -------------------------------------------------
+                    # RESUMEN POR VENDEDOR Y MODELO
+                    # -------------------------------------------------
+                    st.markdown("### Resumen por vendedor y modelo")
+
+                    resumen_vendedor_modelo = (
+                        df_filtrado.groupby(
+                            ["cotizante", "modelo"],
+                            as_index=False
+                        )
+                        .agg(
+                            cotizaciones=("numero_cotizacion", "count"),
+                            clientes=("cliente", "nunique"),
+                            unidades=("cantidad_unidades", "sum"),
+                            monto_potencial=("total_negocio", "sum"),
+                            precio_promedio=("precio_unitario", "mean")
+                        )
+                        .sort_values(
+                            "monto_potencial",
+                            ascending=False
+                        )
+                    )
+
+                    resumen_vendedor_modelo["monto_potencial"] = (
+                        resumen_vendedor_modelo["monto_potencial"]
+                        .apply(formato_usd_dashboard)
+                    )
+                    resumen_vendedor_modelo["precio_promedio"] = (
+                        resumen_vendedor_modelo["precio_promedio"]
+                        .apply(formato_usd_dashboard)
+                    )
+
+                    resumen_vendedor_modelo = (
+                        resumen_vendedor_modelo.rename(columns={
+                            "cotizante": "Vendedor",
+                            "modelo": "Modelo",
+                            "cotizaciones": "Cotizaciones",
+                            "clientes": "Clientes",
+                            "unidades": "Unidades cotizadas",
+                            "monto_potencial": "Monto potencial",
+                            "precio_promedio": "Precio unitario promedio"
+                        })
+                    )
+
+                    st.dataframe(
+                        resumen_vendedor_modelo,
+                        use_container_width=True,
+                        hide_index=True
+                    )
 
     except Exception as e:
-        st.error(f"Error en dashboard ejecutivo: {e}")        
+        st.error(f"Error dashboard: {e}")     
 # =========================================================
 # TAB 5 - CALCULADORA COMERCIAL MULTIMARCA
 # =========================================================
