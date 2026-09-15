@@ -360,24 +360,11 @@ def asegurar_hoja_historial():
     sh = get_gsheet()
 
     try:
-        # Buscar la hoja existente
         ws = sh.worksheet("HistorialCotizaciones")
 
     except gspread.exceptions.WorksheetNotFound:
         raise RuntimeError(
-            "No se encontró la hoja 'HistorialCotizaciones' "
-            "en el Google Sheet. Créala manualmente y vuelve a ejecutar la app."
-        )
-
-    # Agregar columna estado_negocio si todavía no existe
-    encabezados = ws.row_values(1)
-
-    if "estado_negocio" not in encabezados:
-        nueva_col = len(encabezados) + 1
-        ws.update_cell(
-            1,
-            nueva_col,
-            "estado_negocio"
+            "No se encontró la hoja 'HistorialCotizaciones'."
         )
 
     return ws
