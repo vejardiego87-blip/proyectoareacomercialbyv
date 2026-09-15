@@ -552,7 +552,7 @@ def guardar_cotizacion(data):
         creado_en,
         "En negociación",
     ])
-   cargar_historial.clear()
+
 
 @st.cache_data(ttl=60)
 def cargar_historial():
