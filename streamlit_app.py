@@ -358,10 +358,17 @@ def get_gsheet():
 
 def asegurar_hoja_historial():
     sh = get_gsheet()
+
     try:
         ws = sh.worksheet("HistorialCotizaciones")
+
     except Exception:
-        ws = sh.add_worksheet(title="HistorialCotizaciones", rows=2000, cols=20)
+        ws = sh.add_worksheet(
+            title="HistorialCotizaciones",
+            rows=2000,
+            cols=20
+        )
+
         ws.append_row([
             "id",
             "fecha",
@@ -379,7 +386,16 @@ def asegurar_hoja_historial():
             "contrato_mantto",
             "texto_mantto",
             "creado_en",
+            "estado_negocio"
         ])
+
+    # Si la hoja ya existía, agrega la nueva columna automáticamente
+    encabezados = ws.row_values(1)
+
+    if "estado_negocio" not in encabezados:
+        nueva_col = len(encabezados) + 1
+        ws.update_cell(1, nueva_col, "estado_negocio")
+
     return ws
 
 # =========================================================
@@ -585,6 +601,7 @@ def cargar_historial():
             "capacidad_bateria",
             "lugar_entrega",
             "creado_en",
+            "estado_negocio",
         ])
 
     df = pd.DataFrame(registros)
@@ -602,13 +619,31 @@ def cargar_historial():
         "capacidad_bateria",
         "lugar_entrega",
         "creado_en",
+        "estado_negocio",
     ]
 
     for c in columnas_esperadas:
         if c not in df.columns:
             df[c] = ""
 
-    return df[columnas_esperadas].sort_values("id", ascending=False)
+    # Las cotizaciones antiguas que no tienen estado
+    # aparecerán inicialmente como "En negociación"
+    df["estado_negocio"] = (
+        df["estado_negocio"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
+    df.loc[
+        df["estado_negocio"] == "",
+        "estado_negocio"
+    ] = "En negociación"
+
+    return df[columnas_esperadas].sort_values(
+        "id",
+        ascending=False
+    )
 
 
 def eliminar_cotizacion_por_id(cotizacion_id):
@@ -632,6 +667,45 @@ def eliminar_cotizacion_por_id(cotizacion_id):
 
     ws.clear()
     ws.update("A1", nuevas_filas)
+
+def actualizar_estado_negocio(cotizacion_id, nuevo_estado):
+    ws = asegurar_hoja_historial()
+    valores = ws.get_all_values()
+
+    if not valores or len(valores) < 2:
+        return False
+
+    encabezados = valores[0]
+
+    if "id" not in encabezados:
+        return False
+
+    if "estado_negocio" not in encabezados:
+        nueva_col = len(encabezados) + 1
+        ws.update_cell(1, nueva_col, "estado_negocio")
+        encabezados = ws.row_values(1)
+
+    col_id = encabezados.index("id") + 1
+    col_estado = encabezados.index("estado_negocio") + 1
+
+    for numero_fila in range(2, len(valores) + 1):
+        valor_id = valores[numero_fila - 1][col_id - 1]
+
+        try:
+            if int(valor_id) == int(cotizacion_id):
+
+                ws.update_cell(
+                    numero_fila,
+                    col_estado,
+                    nuevo_estado
+                )
+
+                return True
+
+        except Exception:
+            continue
+
+    return False
 # =========================================================
 # DOCX / PDF
 # =========================================================
@@ -901,38 +975,208 @@ III. La oferta incluye 4 años de telemetría sin costo para el cliente.""",
                 st.error(f"Error al generar la cotización: {e}")
 
 # =========================================================
-# TAB 2 - HISTORIAL / ELIMINAR
+# TAB 2 - HISTORIAL
 # =========================================================
 with tab_hist:
-    st.subheader("Historial")
+
+    st.subheader("📚 Historial de cotizaciones")
 
     try:
         df_hist = cargar_historial()
+
         if df_hist.empty:
             st.info("Aún no hay cotizaciones registradas.")
+
         else:
+            # ---------------------------------------------
+            # Normalizar estado
+            # ---------------------------------------------
+            df_hist["estado_negocio"] = (
+                df_hist["estado_negocio"]
+                .fillna("En negociación")
+                .replace("", "En negociación")
+            )
+
+            # ---------------------------------------------
+            # Indicadores
+            # ---------------------------------------------
+            total_cotizaciones = len(df_hist)
+            cerradas = (df_hist["estado_negocio"] == "Cerrado").sum()
+            negociacion = (df_hist["estado_negocio"] == "En negociación").sum()
+            no_cerradas = (df_hist["estado_negocio"] == "No cerrado").sum()
+
+            r1, r2, r3, r4 = st.columns(4)
+
+            r1.metric("Total cotizaciones", total_cotizaciones)
+            r2.metric("🟢 Cerradas", cerradas)
+            r3.metric("🟠 En negociación", negociacion)
+            r4.metric("🔴 No cerradas", no_cerradas)
+
+            st.markdown("---")
+
+            # ---------------------------------------------
+            # Tabla
+            # ---------------------------------------------
+            st.markdown("### Cotizaciones")
+
             vista = df_hist.copy()
+
             vista["precio_unitario"] = vista["precio_unitario"].apply(usd_fmt)
             vista["total_negocio"] = vista["total_negocio"].apply(usd_fmt)
-            st.dataframe(vista, use_container_width=True)
 
-            st.markdown("### Eliminar cotización")
+            vista["Estado"] = vista["estado_negocio"].map({
+                "Cerrado": "🟢 Cerrado",
+                "En negociación": "🟠 En negociación",
+                "No cerrado": "🔴 No cerrado"
+            }).fillna("🟠 En negociación")
+
+            columnas_mostrar = [
+                "numero_cotizacion",
+                "fecha",
+                "cliente",
+                "cotizante",
+                "modelo",
+                "cantidad_unidades",
+                "precio_unitario",
+                "total_negocio",
+                "Estado"
+            ]
+
+            st.dataframe(
+                vista[columnas_mostrar],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "numero_cotizacion": "Cotización",
+                    "fecha": "Fecha",
+                    "cliente": "Cliente",
+                    "cotizante": "Vendedor",
+                    "modelo": "Modelo",
+                    "cantidad_unidades": "Unidades",
+                    "precio_unitario": "Precio unitario",
+                    "total_negocio": "Total negocio",
+                    "Estado": "Estado negocio",
+                }
+            )
+
+            st.markdown("---")
+
+            # ---------------------------------------------
+            # Cambiar estado
+            # ---------------------------------------------
+            st.markdown("### 🎯 Actualizar estado del negocio")
+
             opciones = [
-                f"{row['id']} | {row['numero_cotizacion']} | {row['cliente']} | {row['modelo']}"
+                (
+                    f"{row['id']} | "
+                    f"{row['numero_cotizacion']} | "
+                    f"{row['cliente']} | "
+                    f"{row['modelo']}"
+                )
                 for _, row in df_hist.iterrows()
             ]
-            seleccion = st.selectbox("Selecciona una cotización para eliminar", opciones)
 
-            if st.button("Eliminar cotización seleccionada", type="secondary"):
-                cotizacion_id = int(seleccion.split("|")[0].strip())
-                eliminar_cotizacion_por_id(cotizacion_id)
-                st.success("Cotización eliminada. El correlativo queda disponible nuevamente.")
-                st.rerun()
+            col1, col2 = st.columns([2, 1])
+
+            with col1:
+                seleccion_estado = st.selectbox(
+                    "Selecciona una cotización",
+                    opciones,
+                    key="hist_estado_cotizacion"
+                )
+
+            cotizacion_id_estado = int(
+                seleccion_estado.split("|")[0].strip()
+            )
+
+            fila_seleccionada = df_hist[
+                df_hist["id"].astype(str)
+                == str(cotizacion_id_estado)
+            ].iloc[0]
+
+            estado_actual = fila_seleccionada["estado_negocio"]
+
+            estados = [
+                "En negociación",
+                "Cerrado",
+                "No cerrado"
+            ]
+
+            try:
+                indice_estado = estados.index(estado_actual)
+            except ValueError:
+                indice_estado = 0
+
+            with col2:
+                nuevo_estado = st.selectbox(
+                    "Estado del negocio",
+                    estados,
+                    index=indice_estado,
+                    key="hist_nuevo_estado"
+                )
+
+            st.caption(
+                f"Cliente: {fila_seleccionada['cliente']} · "
+                f"Vendedor: {fila_seleccionada['cotizante']} · "
+                f"Modelo: {fila_seleccionada['modelo']}"
+            )
+
+            if st.button(
+                "💾 Guardar estado",
+                type="primary",
+                use_container_width=True
+            ):
+                actualizado = actualizar_estado_negocio(
+                    cotizacion_id_estado,
+                    nuevo_estado
+                )
+
+                if actualizado:
+                    st.success(
+                        f"Estado actualizado a: {nuevo_estado}"
+                    )
+                    st.rerun()
+                else:
+                    st.error(
+                        "No fue posible actualizar el estado."
+                    )
+
+            st.markdown("---")
+
+            # ---------------------------------------------
+            # Eliminar cotización
+            # ---------------------------------------------
+            with st.expander("🗑️ Eliminar cotización"):
+
+                seleccion_eliminar = st.selectbox(
+                    "Selecciona una cotización para eliminar",
+                    opciones,
+                    key="hist_eliminar"
+                )
+
+                if st.button(
+                    "Eliminar cotización seleccionada",
+                    type="secondary"
+                ):
+                    cotizacion_id = int(
+                        seleccion_eliminar
+                        .split("|")[0]
+                        .strip()
+                    )
+
+                    eliminar_cotizacion_por_id(cotizacion_id)
+
+                    st.success(
+                        "Cotización eliminada. "
+                        "El correlativo queda disponible nuevamente."
+                    )
+
+                    st.rerun()
 
     except Exception as e:
-        st.error(f"No fue posible cargar el historial: {e}")
-
-
+        st.error(
+            f"No fue posible cargar el historial: {e}"
+        )
 
 # =========================================================
 # TAB 3 - EFICIENCIA ENERGÉTICA
