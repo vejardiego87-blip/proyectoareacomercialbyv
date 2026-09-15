@@ -361,13 +361,12 @@ def asegurar_hoja_historial():
 
     try:
         ws = sh.worksheet("HistorialCotizaciones")
+        return ws
 
     except gspread.exceptions.WorksheetNotFound:
         raise RuntimeError(
             "No se encontró la hoja 'HistorialCotizaciones'."
         )
-
-    return ws
 
 # =========================================================
 # BASE DE DATOS
@@ -551,11 +550,15 @@ def guardar_cotizacion(data):
         data["contrato_mantto"],
         data["texto_mantto"],
         creado_en,
+        "En negociación",
     ])
-   
 
+cargar_historial.clear()
+
+@st.cache_data(ttl=60)
 def cargar_historial():
     ws = asegurar_hoja_historial()
+
     registros = ws.get_all_records()
 
     if not registros:
@@ -597,8 +600,6 @@ def cargar_historial():
         if c not in df.columns:
             df[c] = ""
 
-    # Las cotizaciones antiguas que no tienen estado
-    # aparecerán inicialmente como "En negociación"
     df["estado_negocio"] = (
         df["estado_negocio"]
         .fillna("")
@@ -666,11 +667,12 @@ def actualizar_estado_negocio(cotizacion_id, nuevo_estado):
             if int(valor_id) == int(cotizacion_id):
 
                 ws.update_cell(
-                    numero_fila,
-                    col_estado,
-                    nuevo_estado
+                numero_fila,
+                 col_estado,
+                 nuevo_estado
                 )
 
+                cargar_historial.clear()
                 return True
 
         except Exception:
